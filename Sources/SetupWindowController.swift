@@ -7,13 +7,18 @@ final class SetupWindowController: NSObject {
     private var window: NSWindow?
     private let apiKeyField = NSTextField(frame: .zero)
     private let hintLabel = NSTextField(frame: .zero)
+    private var saveButton: NSButton!
 
     var onDismiss: (() -> Void)?
 
     func showWindow() {
         if window == nil { buildWindow() }
+
+        // Temporarily promote to .regular so the Edit menu (⌘V etc.) works
+        NSApp.setActivationPolicy(.regular)
         window?.makeKeyAndOrderFront(nil)
         window?.center()
+        window?.makeFirstResponder(apiKeyField)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -25,7 +30,7 @@ final class SetupWindowController: NSObject {
 
     private func buildWindow() {
         let width: CGFloat = 460
-        let height: CGFloat = 260
+        let height: CGFloat = 280
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -35,18 +40,12 @@ final class SetupWindowController: NSObject {
         )
         win.title = "欢迎使用 GoldBar"
         win.isReleasedWhenClosed = false
-
-        // Prevent closing via ⌘W — user must provide a key
-        win.standardWindowButton(.closeButton)?.isHidden = true
+        // Allow closing — user can configure later via Settings
+        win.delegate = self
 
         guard let contentView = win.contentView else { return }
 
-        // --- Icon / Title ---
-        let titleLabel = NSTextField(labelWithString: "🟡 GoldBar")
-        titleLabel.font = NSFont.boldSystemFont(ofSize: 20)
-        titleLabel.alignment = .center
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-
+        // --- Subtitle ---
         let subtitleLabel = NSTextField(wrappingLabelWithString:
             "GoldBar 需要 AllTick API Key 才能获取实时金价数据。\n请前往 alltick.co 注册并获取免费 Token。")
         subtitleLabel.alignment = .center
@@ -55,7 +54,8 @@ final class SetupWindowController: NSObject {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // --- API Key field ---
-        apiKeyField.placeholderString = "粘贴你的 AllTick API Key"
+        // Use NSTextField subclass to ensure paste works even without Edit menu
+        apiKeyField.placeholderString = "粘贴你的 AllTick API Key (⌘V)"
         apiKeyField.isBordered = true
         apiKeyField.bezelStyle = .squareBezel
         apiKeyField.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
@@ -66,7 +66,7 @@ final class SetupWindowController: NSObject {
             title: "获取免费 API Key", target: self, action: #selector(openAllTick))
         getKeyButton.bezelStyle = .rounded
 
-        let saveButton = NSButton(
+        saveButton = NSButton(
             title: "开始使用", target: self, action: #selector(saveAndStart))
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\r"
@@ -88,7 +88,7 @@ final class SetupWindowController: NSObject {
         hintLabel.drawsBackground = false
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // --- Track field changes to enable Save button ---
+        // --- Track field changes ---
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(textDidChange),
@@ -97,17 +97,14 @@ final class SetupWindowController: NSObject {
         )
 
         // Layout
-        contentView.addSubview(titleLabel)
         contentView.addSubview(subtitleLabel)
         contentView.addSubview(apiKeyField)
         contentView.addSubview(buttonRow)
         contentView.addSubview(hintLabel)
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 28),
-            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            // Extra top padding to avoid overlap with title bar
+            subtitleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 36),
             subtitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             subtitleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
 
@@ -131,11 +128,7 @@ final class SetupWindowController: NSObject {
 
     @objc private func textDidChange() {
         let trimmed = apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Find the Save button (second in the stack) and enable/disable
-        if let buttonRow = apiKeyField.superview?.subviews.compactMap({ $0 as? NSStackView }).first,
-           let saveBtn = buttonRow.arrangedSubviews.last as? NSButton {
-            saveBtn.isEnabled = !trimmed.isEmpty
-        }
+        saveButton.isEnabled = !trimmed.isEmpty
         hintLabel.stringValue = ""
     }
 
@@ -146,7 +139,6 @@ final class SetupWindowController: NSObject {
             return
         }
 
-        // Quick validation: API key should be a reasonable length hex string
         guard key.count >= 16 else {
             hintLabel.stringValue = "API Key 格式不正确，请检查后重试"
             return
@@ -154,6 +146,9 @@ final class SetupWindowController: NSObject {
 
         Preferences.shared.apiKey = key
         hintLabel.stringValue = ""
+
+        // Demote back to accessory (menu-bar-only) mode
+        NSApp.setActivationPolicy(.accessory)
         window?.close()
         onDismiss?()
     }
@@ -161,6 +156,19 @@ final class SetupWindowController: NSObject {
     @objc private func openAllTick() {
         if let url = URL(string: "https://alltick.co") {
             NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension SetupWindowController: NSWindowDelegate {
+
+    func windowWillClose(_ notification: Notification) {
+        // If user closes window without configuring a key,
+        // keep the app alive and demote to menu-bar-only mode.
+        if !Preferences.shared.hasAPIKey {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 }

@@ -46,7 +46,15 @@ final class MenuBarController: NSObject {
             startDataFetching()
             Task { await refreshExchangeRate() }
         } else {
-            showSetupWindow()
+            statusItem.button?.title = "Au ⚙️"
+            goldPriceItem.title = "金价: 请先配置 API Key"
+            exchangeRateItem.title = "点击「设置...」配置 API Key"
+            updateTimeItem.title = "更新时间: --"
+
+            // Slight delay so the status item is on screen before the window pops
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.showSetupWindow()
+            }
         }
     }
 

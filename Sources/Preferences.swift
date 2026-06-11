@@ -48,37 +48,22 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.colorScheme) }
     }
 
-    /// Status bar font size (pt). Integer values only, clamped 8–18.
+    /// Status bar font size (pt). Integer, 8…18. Slider guarantees valid input.
     var fontSize: Double {
         get {
             let raw = defaults.double(forKey: Key.fontSize)
-            // Unset (0.0) or out-of-range → default
-            guard raw >= Self.minFontSize, raw <= Self.maxFontSize else {
-                return Self.defaultFontSize
-            }
-            return raw
+            return (raw >= Self.minFontSize && raw <= Self.maxFontSize) ? raw : Self.defaultFontSize
         }
-        set {
-            let clamped = min(max(newValue.rounded(), Self.minFontSize), Self.maxFontSize)
-            defaults.set(clamped, forKey: Key.fontSize)
-        }
+        set { defaults.set(newValue, forKey: Key.fontSize) }
     }
 
-    /// Baseline offset for menu bar text (pt). Step 0.5, clamped -4.0…+4.0.
+    /// Baseline offset (pt). Multiple of 0.5, -4.0…+4.0. Slider guarantees valid input.
     var baselineOffset: Double {
         get {
             let raw = defaults.double(forKey: Key.baselineOffset)
-            guard raw >= Self.minBaselineOffset, raw <= Self.maxBaselineOffset else {
-                return Self.defaultBaselineOffset
-            }
-            return raw
+            return (raw >= Self.minBaselineOffset && raw <= Self.maxBaselineOffset) ? raw : Self.defaultBaselineOffset
         }
-        set {
-            // Snap to nearest 0.5
-            let snapped = (newValue * 2.0).rounded() / 2.0
-            let clamped = min(max(snapped, Self.minBaselineOffset), Self.maxBaselineOffset)
-            defaults.set(clamped, forKey: Key.baselineOffset)
-        }
+        set { defaults.set(newValue, forKey: Key.baselineOffset) }
     }
 
     /// Whether the user has configured an API key

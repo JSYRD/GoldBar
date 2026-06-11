@@ -21,9 +21,9 @@ final class SettingsWindowController: NSObject {
     private let manualRateField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
 
-    /// Captured slider values — decoupled from NSSlider's internal state
-    private var pendingFontSize: Double = Preferences.defaultFontSize
-    private var pendingBaselineOffset: Double = Preferences.defaultBaselineOffset
+    /// Captured values — stored as integer "steps", converted on save
+    private var pendingFontSize: Int = Int(Preferences.defaultFontSize)
+    private var pendingBaselineStep: Int = Int(Preferences.defaultBaselineOffset * 2.0)
 
     func showWindow() {
         if window == nil {
@@ -73,24 +73,26 @@ final class SettingsWindowController: NSObject {
         ])
         dataSourcePopup.toolTip = "HTTP: 定时拉取数据，节省资源。WebSocket: 长连接实时推送，更新更快"
 
-        // --- Font size slider (integer steps, no tick marks) ---
+        // --- Font size slider: integer steps 8…18 → actual = step ---
         let fontSizeLabelLeft = makeLabel("显示大小:")
-        fontSizeSlider.minValue = Preferences.minFontSize
-        fontSizeSlider.maxValue = Preferences.maxFontSize
-        fontSizeSlider.doubleValue = Preferences.shared.fontSize
-        fontSizeSlider.isContinuous = true
+        fontSizeSlider.minValue = 8
+        fontSizeSlider.maxValue = 18
+        fontSizeSlider.numberOfTickMarks = 11
+        fontSizeSlider.allowsTickMarkValuesOnly = true
+        fontSizeSlider.integerValue = Int(Preferences.shared.fontSize)
         fontSizeSlider.target = self
         fontSizeSlider.action = #selector(fontSizeChanged)
         fontSizeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
         fontSizeLabel.alignment = .center
         fontSizeLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // --- Baseline offset slider (0.5 pt steps) ---
+        // --- Baseline slider: integer steps -8…+8 → actual = step × 0.5 pt ---
         let baselineLabelLeft = makeLabel("垂直偏移:")
-        baselineSlider.minValue = Preferences.minBaselineOffset
-        baselineSlider.maxValue = Preferences.maxBaselineOffset
-        baselineSlider.doubleValue = Preferences.shared.baselineOffset
-        baselineSlider.isContinuous = true
+        baselineSlider.minValue = -8
+        baselineSlider.maxValue = 8
+        baselineSlider.numberOfTickMarks = 17
+        baselineSlider.allowsTickMarkValuesOnly = true
+        baselineSlider.integerValue = Int(Preferences.shared.baselineOffset * 2.0)
         baselineSlider.target = self
         baselineSlider.action = #selector(baselineChanged)
         baselineLabel.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
@@ -239,12 +241,12 @@ final class SettingsWindowController: NSObject {
         apiKeyField.placeholderString = prefs.hasAPIKey
             ? "输入你的 AllTick API Key"
             : "⚠️ 请先粘贴你的 AllTick API Key 以开始使用"
-        pendingFontSize = prefs.fontSize
-        pendingBaselineOffset = prefs.baselineOffset
-        fontSizeSlider.doubleValue = pendingFontSize
-        fontSizeLabel.stringValue = String(format: "%.0f pt", pendingFontSize)
-        baselineSlider.doubleValue = pendingBaselineOffset
-        baselineLabel.stringValue = String(format: "%+.1f pt", pendingBaselineOffset)
+        pendingFontSize = Int(prefs.fontSize)
+        pendingBaselineStep = Int(prefs.baselineOffset * 2.0)
+        fontSizeSlider.integerValue = pendingFontSize
+        fontSizeLabel.stringValue = "\(pendingFontSize) pt"
+        baselineSlider.integerValue = pendingBaselineStep
+        baselineLabel.stringValue = String(format: "%+.1f pt", Double(pendingBaselineStep) * 0.5)
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
@@ -279,14 +281,14 @@ final class SettingsWindowController: NSObject {
     }
 
     @objc private func fontSizeChanged() {
-        // Only capture — don't write back to slider (avoids re-entrancy)
-        pendingFontSize = fontSizeSlider.doubleValue.rounded()
-        fontSizeLabel.stringValue = String(format: "%.0f pt", pendingFontSize)
+        pendingFontSize = fontSizeSlider.integerValue       // 8…18, directly the pt value
+        fontSizeLabel.stringValue = "\(pendingFontSize) pt"
     }
 
     @objc private func baselineChanged() {
-        pendingBaselineOffset = (baselineSlider.doubleValue * 2.0).rounded() / 2.0
-        baselineLabel.stringValue = String(format: "%+.1f pt", pendingBaselineOffset)
+        pendingBaselineStep = baselineSlider.integerValue   // -8…+8, step index
+        let actual = Double(pendingBaselineStep) * 0.5      // → -4.0…+4.0
+        baselineLabel.stringValue = String(format: "%+.1f pt", actual)
     }
 
     @objc private func saveSettings() {
@@ -303,8 +305,8 @@ final class SettingsWindowController: NSObject {
 
         prefs.apiKey = newKey
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
-        prefs.fontSize = pendingFontSize
-        prefs.baselineOffset = pendingBaselineOffset
+        prefs.fontSize = Double(pendingFontSize)
+        prefs.baselineOffset = Double(pendingBaselineStep) * 0.5
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

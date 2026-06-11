@@ -1,3 +1,5 @@
+[English](./README.md) | [中文](./README_CN.md) | [开发者文档](./DEVELOPER_CN.md)
+
 # GoldBar — 实时金价菜单栏应用
 
 在 macOS 菜单栏中实时显示当前黄金价格（人民币/克），含涨跌百分比。

@@ -43,6 +43,11 @@ final class MenuBarController: NSObject {
     private let httpModeItem = NSMenuItem(title: "HTTP 轮询", action: #selector(switchToHTTP), keyEquivalent: "")
     private let wsModeItem = NSMenuItem(title: "WebSocket 实时推送", action: #selector(switchToWebSocket), keyEquivalent: "")
 
+    // Color scheme submenu
+    private let colorSchemeSubmenu = NSMenu()
+    private let colorWesternItem = NSMenuItem(title: "绿涨红跌 (国际)", action: #selector(switchToWesternColors), keyEquivalent: "")
+    private let colorChineseItem = NSMenuItem(title: "红涨绿跌 (国内)", action: #selector(switchToChineseColors), keyEquivalent: "")
+
     // MARK: - Init
     override init() {
         super.init()
@@ -110,6 +115,17 @@ final class MenuBarController: NSObject {
         let dataSourceSubmenuItem = NSMenuItem(title: "数据源", action: nil, keyEquivalent: "")
         dataSourceSubmenuItem.submenu = dataSourceSubmenu
         menu.addItem(dataSourceSubmenuItem)
+
+        // Color scheme submenu
+        colorWesternItem.target = self
+        colorChineseItem.target = self
+        colorSchemeSubmenu.addItem(colorWesternItem)
+        colorSchemeSubmenu.addItem(colorChineseItem)
+        updateColorSchemeCheckmark()
+
+        let colorSchemeSubmenuItem = NSMenuItem(title: "涨跌配色", action: nil, keyEquivalent: "")
+        colorSchemeSubmenuItem.submenu = colorSchemeSubmenu
+        menu.addItem(colorSchemeSubmenuItem)
 
         // Refresh Now
         let refreshItem = NSMenuItem(
@@ -328,9 +344,7 @@ final class MenuBarController: NSObject {
         // Status bar: price + change arrow + percentage (colored)
         if let chg = changePercent {
             let arrow = chg >= 0 ? "↑" : "↓"
-            let color: NSColor = chg >= 0 ?
-                NSColor.systemGreen.blended(withFraction: 0.3, of: .black) ?? .systemGreen :
-                NSColor.systemRed
+            let color = changeColor(isUp: chg >= 0)
             let title = String(format: "Au ¥%.1f/g \(arrow)%.2f%%", rmbPerGram, abs(chg))
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: title,
@@ -424,6 +438,42 @@ final class MenuBarController: NSObject {
         Preferences.shared.dataSourceMode = "websocket"
         restartDataFetching()
     }
+
+    // MARK: - Color scheme
+
+    /// Returns the appropriate color for a price move based on user preference.
+    /// "western": green for up, red for down.  "chinese": red for up, green for down.
+    private func changeColor(isUp: Bool) -> NSColor {
+        let isChinese = Preferences.shared.colorScheme == "chinese"
+        let green = NSColor.systemGreen.blended(withFraction: 0.3, of: .black) ?? .systemGreen
+        let red = NSColor.systemRed
+
+        if isUp {
+            return isChinese ? red : green
+        } else {
+            return isChinese ? green : red
+        }
+    }
+
+    private func updateColorSchemeCheckmark() {
+        let scheme = Preferences.shared.colorScheme
+        colorWesternItem.state = (scheme == "western") ? .on : .off
+        colorChineseItem.state = (scheme == "chinese") ? .on : .off
+    }
+
+    @objc private func switchToWesternColors() {
+        Preferences.shared.colorScheme = "western"
+        updateColorSchemeCheckmark()
+        updateDisplayIfNeeded()
+    }
+
+    @objc private func switchToChineseColors() {
+        Preferences.shared.colorScheme = "chinese"
+        updateColorSchemeCheckmark()
+        updateDisplayIfNeeded()
+    }
+
+    // MARK: - Window actions
 
     @objc private func openSettings() {
         if settingsWC == nil {

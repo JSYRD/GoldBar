@@ -18,6 +18,7 @@ final class Preferences {
         static let dataSourceMode = "dataSourceMode" // "http" or "websocket"
         static let previousClose = "previousClose"
         static let previousCloseDate = "previousCloseDate"
+        static let colorScheme = "colorScheme" // "western" (green↑/red↓) or "chinese" (red↑/green↓)
     }
 
     // MARK: - Default values
@@ -31,6 +32,12 @@ final class Preferences {
             return (val?.isEmpty == false) ? val : nil
         }
         set { defaults.set(newValue, forKey: Key.apiKey) }
+    }
+
+    /// Color scheme for price change: "western" = green↑/red↓, "chinese" = red↑/green↓
+    var colorScheme: String {
+        get { defaults.string(forKey: Key.colorScheme) ?? "western" }
+        set { defaults.set(newValue, forKey: Key.colorScheme) }
     }
 
     /// Whether the user has configured an API key

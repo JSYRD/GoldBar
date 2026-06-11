@@ -1,4 +1,4 @@
-[English](./README.md) | [中文](./README_CN.md) | [开发者文档](./DEVELOPER.md)
+English | [中文](./README_CN.md) | [开发者文档](./DEVELOPER.md)
 
 # GoldBar — Real-Time Gold Price Menu Bar App
 

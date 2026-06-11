@@ -1,4 +1,4 @@
-[English](./README.md) | [中文](./README_CN.md) | [开发者文档](./DEVELOPER_CN.md)
+[English](./README.md) | 中文 | [开发者文档](./DEVELOPER_CN.md)
 
 # GoldBar — 实时金价菜单栏应用
 

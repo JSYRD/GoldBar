@@ -20,6 +20,7 @@ final class Preferences {
         static let previousCloseDate = "previousCloseDate"
         static let colorScheme = "colorScheme" // "western" (green↑/red↓) or "chinese" (red↑/green↓)
         static let fontSize = "fontSize"
+        static let baselineOffset = "baselineOffset"
     }
 
     // MARK: - Default values
@@ -28,6 +29,9 @@ final class Preferences {
     static let minFontSize: Double = 8.0
     static let maxFontSize: Double = 18.0
     static let defaultFontSize: Double = 11.0
+    static let minBaselineOffset: Double = -4.0
+    static let maxBaselineOffset: Double = 4.0
+    static let defaultBaselineOffset: Double = -0.5
 
     /// AllTick API key (token). Returns nil if not yet configured.
     var apiKey: String? {
@@ -44,18 +48,36 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.colorScheme) }
     }
 
-    /// Status bar font size (pt). Clamped to minFontSize...maxFontSize.
+    /// Status bar font size (pt). Integer values only, clamped 8–18.
     var fontSize: Double {
         get {
-            let val = defaults.double(forKey: Key.fontSize)
-            guard val >= Self.minFontSize, val <= Self.maxFontSize else {
+            let raw = defaults.double(forKey: Key.fontSize)
+            // Unset (0.0) or out-of-range → default
+            guard raw >= Self.minFontSize, raw <= Self.maxFontSize else {
                 return Self.defaultFontSize
             }
-            return val
+            return raw
         }
         set {
-            let clamped = min(max(newValue, Self.minFontSize), Self.maxFontSize)
+            let clamped = min(max(newValue.rounded(), Self.minFontSize), Self.maxFontSize)
             defaults.set(clamped, forKey: Key.fontSize)
+        }
+    }
+
+    /// Baseline offset for menu bar text (pt). Step 0.5, clamped -4.0…+4.0.
+    var baselineOffset: Double {
+        get {
+            let raw = defaults.double(forKey: Key.baselineOffset)
+            guard raw >= Self.minBaselineOffset, raw <= Self.maxBaselineOffset else {
+                return Self.defaultBaselineOffset
+            }
+            return raw
+        }
+        set {
+            // Snap to nearest 0.5
+            let snapped = (newValue * 2.0).rounded() / 2.0
+            let clamped = min(max(snapped, Self.minBaselineOffset), Self.maxBaselineOffset)
+            defaults.set(clamped, forKey: Key.baselineOffset)
         }
     }
 

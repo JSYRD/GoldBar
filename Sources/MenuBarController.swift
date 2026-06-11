@@ -6,7 +6,6 @@ final class MenuBarController: NSObject {
 
     // MARK: - Constants
     private static let troyOunceToGrams = 31.1034768
-    private static let textBaselineOffset: CGFloat = -0.5
 
     /// Current font size from preferences — use this everywhere instead of a hardcoded value
     private var statusFont: NSFont {
@@ -357,12 +356,12 @@ final class MenuBarController: NSObject {
                 attributes: [
                     .font: statusFont,
                     .foregroundColor: color,
-                    .baselineOffset: Self.textBaselineOffset
+                    .baselineOffset: Preferences.shared.baselineOffset
                 ])
         } else {
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: String(format: "Au ¥%.1f/g", rmbPerGram),
-                attributes: [.baselineOffset: Self.textBaselineOffset])
+                attributes: [.baselineOffset: Preferences.shared.baselineOffset])
         }
 
         // Menu items
@@ -387,7 +386,7 @@ final class MenuBarController: NSObject {
         if lastGoldResult == nil {
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: "Au --.-/g",
-                attributes: [.baselineOffset: Self.textBaselineOffset])
+                attributes: [.baselineOffset: Preferences.shared.baselineOffset])
         } else {
             let title = statusItem.button?.attributedTitle.string ?? "Au --.-/g"
             let muted = NSAttributedString(
@@ -395,7 +394,7 @@ final class MenuBarController: NSObject {
                 attributes: [
                     .font: statusFont,
                     .foregroundColor: NSColor.systemGray,
-                    .baselineOffset: Self.textBaselineOffset
+                    .baselineOffset: Preferences.shared.baselineOffset
                 ])
             statusItem.button?.attributedTitle = muted
         }

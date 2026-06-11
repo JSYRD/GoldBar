@@ -15,6 +15,8 @@ final class SettingsWindowController: NSObject {
     private let dataSourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fontSizeSlider = NSSlider(frame: .zero)
     private let fontSizeLabel = NSTextField(labelWithString: "11 pt")
+    private let baselineSlider = NSSlider(frame: .zero)
+    private let baselineLabel = NSTextField(labelWithString: "-0.5 pt")
     private let rateModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let manualRateField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
@@ -31,7 +33,7 @@ final class SettingsWindowController: NSObject {
 
     private func buildWindow() {
         let width: CGFloat = 480
-        let height: CGFloat = 350
+        let height: CGFloat = 390
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -67,19 +69,29 @@ final class SettingsWindowController: NSObject {
         ])
         dataSourcePopup.toolTip = "HTTP: 定时拉取数据，节省资源。WebSocket: 长连接实时推送，更新更快"
 
-        // --- Font size slider ---
+        // --- Font size slider (integer steps, no tick marks) ---
         let fontSizeLabelLeft = makeLabel("显示大小:")
         fontSizeSlider.minValue = Preferences.minFontSize
         fontSizeSlider.maxValue = Preferences.maxFontSize
         fontSizeSlider.doubleValue = Preferences.shared.fontSize
-        fontSizeSlider.numberOfTickMarks = 11
-        fontSizeSlider.allowsTickMarkValuesOnly = true
         fontSizeSlider.isContinuous = true
         fontSizeSlider.target = self
         fontSizeSlider.action = #selector(fontSizeChanged)
         fontSizeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
         fontSizeLabel.alignment = .center
         fontSizeLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        // --- Baseline offset slider (0.5 pt steps) ---
+        let baselineLabelLeft = makeLabel("垂直偏移:")
+        baselineSlider.minValue = Preferences.minBaselineOffset
+        baselineSlider.maxValue = Preferences.maxBaselineOffset
+        baselineSlider.doubleValue = Preferences.shared.baselineOffset
+        baselineSlider.isContinuous = true
+        baselineSlider.target = self
+        baselineSlider.action = #selector(baselineChanged)
+        baselineLabel.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        baselineLabel.alignment = .center
+        baselineLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // --- Rate mode popup ---
         rateModePopup.addItems(withTitles: ["自动获取 (推荐)", "手动输入"])
@@ -118,6 +130,7 @@ final class SettingsWindowController: NSObject {
         let apiKeyRow = makeRow(label: apiKeyLabel, control: apiKeyField)
         let dataSourceRow = makeRow(label: dataSourceLabel, control: dataSourcePopup)
         let fontSizeRow = makeRow(label: fontSizeLabelLeft, control: fontSizeSlider, trailing: fontSizeLabel)
+        let baselineRow = makeRow(label: baselineLabelLeft, control: baselineSlider, trailing: baselineLabel)
         let rateModeRow = makeRow(label: rateModeLabel, control: rateModePopup)
         let manualRateRow = makeRow(label: manualRateLabel, control: manualRateField)
 
@@ -139,6 +152,7 @@ final class SettingsWindowController: NSObject {
             separator,
             dataSourceRow,
             fontSizeRow,
+            baselineRow,
             rateModeRow,
             manualRateRow,
             buttonRow,
@@ -169,6 +183,7 @@ final class SettingsWindowController: NSObject {
             apiKeyRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             dataSourceRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             fontSizeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            baselineRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             rateModeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             manualRateRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             buttonRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
@@ -222,6 +237,8 @@ final class SettingsWindowController: NSObject {
             : "⚠️ 请先粘贴你的 AllTick API Key 以开始使用"
         fontSizeSlider.doubleValue = prefs.fontSize
         fontSizeLabel.stringValue = String(format: "%.0f pt", prefs.fontSize)
+        baselineSlider.doubleValue = prefs.baselineOffset
+        baselineLabel.stringValue = String(format: "%+.1f pt", prefs.baselineOffset)
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
@@ -256,8 +273,15 @@ final class SettingsWindowController: NSObject {
     }
 
     @objc private func fontSizeChanged() {
-        let size = round(fontSizeSlider.doubleValue)
+        let size = fontSizeSlider.doubleValue.rounded()
+        fontSizeSlider.doubleValue = size  // snap to integer
         fontSizeLabel.stringValue = String(format: "%.0f pt", size)
+    }
+
+    @objc private func baselineChanged() {
+        let val = (baselineSlider.doubleValue * 2.0).rounded() / 2.0  // snap to 0.5
+        baselineSlider.doubleValue = val
+        baselineLabel.stringValue = String(format: "%+.1f pt", val)
     }
 
     @objc private func saveSettings() {
@@ -274,7 +298,8 @@ final class SettingsWindowController: NSObject {
 
         prefs.apiKey = newKey
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
-        prefs.fontSize = round(fontSizeSlider.doubleValue)
+        prefs.fontSize = fontSizeSlider.doubleValue
+        prefs.baselineOffset = baselineSlider.doubleValue
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

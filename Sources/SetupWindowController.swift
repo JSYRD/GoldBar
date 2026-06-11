@@ -54,11 +54,12 @@ final class SetupWindowController: NSObject {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // --- API Key field ---
-        // Use NSTextField subclass to ensure paste works even without Edit menu
         apiKeyField.placeholderString = "粘贴你的 AllTick API Key (⌘V)"
         apiKeyField.isBordered = true
         apiKeyField.bezelStyle = .squareBezel
         apiKeyField.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        apiKeyField.formatter = SingleLineFormatter()
+        apiKeyField.cell?.usesSingleLineMode = true
         apiKeyField.translatesAutoresizingMaskIntoConstraints = false
 
         // --- Buttons ---

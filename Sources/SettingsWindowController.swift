@@ -54,6 +54,8 @@ final class SettingsWindowController: NSObject {
         apiKeyField.placeholderString = "输入你的 AllTick API Key"
         apiKeyField.isBordered = true
         apiKeyField.bezelStyle = .squareBezel
+        apiKeyField.formatter = SingleLineFormatter()
+        apiKeyField.cell?.usesSingleLineMode = true
         apiKeyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         // --- Data source popup ---

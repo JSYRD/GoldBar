@@ -22,44 +22,39 @@ final class SettingsWindowController: NSObject {
     // MARK: - Build UI
 
     private func buildWindow() {
-        let width: CGFloat = 420
-        let height: CGFloat = 240
+        let width: CGFloat = 480
+        let height: CGFloat = 260
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         win.title = "GoldBar 设置"
+        win.minSize = NSSize(width: 420, height: 220)
         win.center()
         win.isReleasedWhenClosed = false
 
         guard let contentView = win.contentView else { return }
 
-        // Disable auto-resizing mask
-        let allFields: [NSView] = [apiKeyField, rateModePopup, manualRateField, statusLabel]
-        allFields.forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
-
-        // --- API Key row ---
+        // --- Labels ---
         let apiKeyLabel = makeLabel("API Key:")
-        contentView.addSubview(apiKeyLabel)
+        let rateModeLabel = makeLabel("汇率模式:")
+        let manualRateLabel = makeLabel("手动汇率:")
+
+        // --- API Key field ---
         apiKeyField.placeholderString = "输入你的 AllTick API Key"
         apiKeyField.isBordered = true
         apiKeyField.bezelStyle = .squareBezel
-        contentView.addSubview(apiKeyField)
+        apiKeyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        // --- Rate mode row ---
-        let rateModeLabel = makeLabel("汇率模式:")
-        contentView.addSubview(rateModeLabel)
+        // --- Rate mode popup ---
         rateModePopup.addItems(withTitles: ["自动获取 (推荐)", "手动输入"])
         rateModePopup.target = self
         rateModePopup.action = #selector(rateModeChanged)
-        contentView.addSubview(rateModePopup)
 
-        // --- Manual rate row ---
-        let manualRateLabel = makeLabel("手动汇率:")
-        contentView.addSubview(manualRateLabel)
+        // --- Manual rate field ---
         manualRateField.placeholderString = "例如: 6.79"
         manualRateField.isBordered = true
         manualRateField.bezelStyle = .squareBezel
@@ -67,19 +62,16 @@ final class SettingsWindowController: NSObject {
         (manualRateField.formatter as? NumberFormatter)?.allowsFloats = true
         (manualRateField.formatter as? NumberFormatter)?.minimumFractionDigits = 2
         (manualRateField.formatter as? NumberFormatter)?.maximumFractionDigits = 6
-        contentView.addSubview(manualRateField)
 
         // --- Buttons ---
         let saveButton = NSButton(
             title: "保存", target: self, action: #selector(saveSettings))
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\r"
-        contentView.addSubview(saveButton)
 
         let cancelButton = NSButton(
             title: "取消", target: self, action: #selector(closeWindow))
         cancelButton.bezelStyle = .rounded
-        contentView.addSubview(cancelButton)
 
         // --- Status label ---
         statusLabel.isEditable = false
@@ -87,54 +79,67 @@ final class SettingsWindowController: NSObject {
         statusLabel.drawsBackground = false
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-        contentView.addSubview(statusLabel)
 
-        // Layout
-        let views: [String: NSView] = [
-            "apiKeyLabel": apiKeyLabel, "apiKeyField": apiKeyField,
-            "rateModeLabel": rateModeLabel, "rateModePopup": rateModePopup,
-            "manualRateLabel": manualRateLabel, "manualRateField": manualRateField,
-            "saveButton": saveButton, "cancelButton": cancelButton,
-            "statusLabel": statusLabel
-        ]
+        // --- Row stack views ---
+        let apiKeyRow = makeRow(label: apiKeyLabel, control: apiKeyField)
+        let rateModeRow = makeRow(label: rateModeLabel, control: rateModePopup)
+        let manualRateRow = makeRow(label: manualRateLabel, control: manualRateField)
 
-        let metrics: [String: CGFloat] = [
-            "margin": 20, "spacing": 12, "fieldH": 24,
-            "labelW": 80, "buttonW": 90
-        ]
+        let buttonRow = NSStackView(views: [cancelButton, saveButton])
+        buttonRow.orientation = .horizontal
+        buttonRow.alignment = .centerY
+        buttonRow.distribution = .fill
+        buttonRow.spacing = 12
+        // Push buttons to the right
+        buttonRow.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "H:|-margin-[apiKeyLabel(==labelW)]-spacing-[apiKeyField]-margin-|",
-            metrics: metrics, views: views))
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "H:|-margin-[rateModeLabel(==labelW)]-spacing-[rateModePopup]-margin-|",
-            metrics: metrics, views: views))
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "H:|-margin-[manualRateLabel(==labelW)]-spacing-[manualRateField]-margin-|",
-            metrics: metrics, views: views))
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "H:[cancelButton(==buttonW)]-spacing-[saveButton(==buttonW)]-margin-|",
-            metrics: metrics, views: views))
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "H:|-margin-[statusLabel]-margin-|",
-            metrics: metrics, views: views))
+        // --- Main stack ---
+        let mainStack = NSStackView(views: [
+            apiKeyRow,
+            rateModeRow,
+            manualRateRow,
+            buttonRow,
+            statusLabel
+        ])
+        mainStack.orientation = .vertical
+        mainStack.alignment = .leading
+        mainStack.distribution = .fill
+        mainStack.spacing = 14
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.setCustomSpacing(20, after: manualRateRow)
 
-        contentView.addConstraints(NSLayoutConstraint.constraints(
-            withVisualFormat: "V:|-margin-[apiKeyLabel(==fieldH)]-spacing-[rateModeLabel(==fieldH)]-spacing-[manualRateLabel(==fieldH)]-20-[saveButton(==28)]-spacing-[statusLabel]",
-            metrics: metrics, views: views))
+        contentView.addSubview(mainStack)
 
-        // Align fields with their labels
         NSLayoutConstraint.activate([
-            apiKeyField.centerYAnchor.constraint(equalTo: apiKeyLabel.centerYAnchor),
-            apiKeyField.heightAnchor.constraint(equalToConstant: 24),
-            rateModePopup.centerYAnchor.constraint(equalTo: rateModeLabel.centerYAnchor),
-            rateModePopup.heightAnchor.constraint(equalToConstant: 24),
-            manualRateField.centerYAnchor.constraint(equalTo: manualRateLabel.centerYAnchor),
-            manualRateField.heightAnchor.constraint(equalToConstant: 24),
-            cancelButton.centerYAnchor.constraint(equalTo: saveButton.centerYAnchor),
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            mainStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
+
+            // Rows stretch full width
+            apiKeyRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            rateModeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            manualRateRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            buttonRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+
+            // Fixed label widths for alignment
+            apiKeyLabel.widthAnchor.constraint(equalToConstant: 80),
+            rateModeLabel.widthAnchor.constraint(equalToConstant: 80),
+            manualRateLabel.widthAnchor.constraint(equalToConstant: 80),
         ])
 
         window = win
+    }
+
+    /// Create a horizontal row: [label | control]
+    private func makeRow(label: NSTextField, control: NSView) -> NSStackView {
+        let row = NSStackView(views: [label, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
     }
 
     private func makeLabel(_ text: String) -> NSTextField {

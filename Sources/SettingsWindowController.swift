@@ -184,7 +184,10 @@ final class SettingsWindowController: NSObject {
 
     private func refreshFields() {
         let prefs = Preferences.shared
-        apiKeyField.stringValue = prefs.apiKey
+        apiKeyField.stringValue = prefs.apiKey ?? ""
+        apiKeyField.placeholderString = prefs.hasAPIKey
+            ? "输入你的 AllTick API Key"
+            : "⚠️ 请先粘贴你的 AllTick API Key 以开始使用"
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)

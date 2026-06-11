@@ -19,15 +19,20 @@ final class Preferences {
     }
 
     // MARK: - Default values
-    static let defaultAPIKey = "YOUR_API_KEY"
     static let defaultExchangeRate: Double = 6.79
     static let defaultRefreshInterval: TimeInterval = 15.0
 
-    /// AllTick API key (token)
-    var apiKey: String {
-        get { defaults.string(forKey: Key.apiKey) ?? Self.defaultAPIKey }
+    /// AllTick API key (token). Returns nil if not yet configured.
+    var apiKey: String? {
+        get {
+            let val = defaults.string(forKey: Key.apiKey)
+            return (val?.isEmpty == false) ? val : nil
+        }
         set { defaults.set(newValue, forKey: Key.apiKey) }
     }
+
+    /// Whether the user has configured an API key
+    var hasAPIKey: Bool { apiKey != nil }
 
     /// Exchange rate mode: "auto" fetches from API, "manual" uses user-provided value
     var exchangeRateMode: String {

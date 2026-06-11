@@ -25,7 +25,9 @@ final class GoldPriceService {
 
     /// Fetch the latest gold price in USD per troy ounce
     func fetchPrice() async throws -> GoldPriceResult {
-        let apiKey = Preferences.shared.apiKey
+        guard let apiKey = Preferences.shared.apiKey else {
+            throw GoldPriceError.missingAPIKey
+        }
         let trace = UUID().uuidString
 
         // Build query JSON
@@ -102,6 +104,7 @@ final class GoldPriceService {
 enum GoldPriceError: Error, LocalizedError {
     case invalidURL
     case invalidQuery
+    case missingAPIKey
     case httpError(Int)
     case invalidResponse
     case apiError(code: Int, message: String)
@@ -111,6 +114,7 @@ enum GoldPriceError: Error, LocalizedError {
         switch self {
         case .invalidURL:       return "无法构建请求 URL"
         case .invalidQuery:     return "无法构建查询参数"
+        case .missingAPIKey:    return "请先配置 API Key"
         case .httpError(let c): return "HTTP 错误 (\(c))"
         case .invalidResponse:  return "服务器返回了无效数据"
         case .apiError(let c, let m): return "API 错误 (\(c)): \(m)"

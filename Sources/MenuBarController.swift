@@ -16,6 +16,7 @@ final class MenuBarController: NSObject {
     private var statusItem: NSStatusItem!
     private var timer: Timer?
     private var settingsWC: SettingsWindowController?
+    private var setupWC: SetupWindowController?
 
     // MARK: - State
     private var lastGoldResult: GoldPriceResult?
@@ -40,10 +41,13 @@ final class MenuBarController: NSObject {
         setupStatusItem()
         setupWebSocketCallbacks()
         observeSettingsChanges()
-        startDataFetching()
 
-        // Fetch exchange rate at launch (cached for 1 hour)
-        Task { await refreshExchangeRate() }
+        if Preferences.shared.hasAPIKey {
+            startDataFetching()
+            Task { await refreshExchangeRate() }
+        } else {
+            showSetupWindow()
+        }
     }
 
     // MARK: - Setup
@@ -331,6 +335,17 @@ final class MenuBarController: NSObject {
         }
         settingsWC?.showWindow()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func showSetupWindow() {
+        if setupWC == nil {
+            setupWC = SetupWindowController()
+        }
+        setupWC?.onDismiss = { [weak self] in
+            self?.startDataFetching()
+            Task { await self?.refreshExchangeRate() }
+        }
+        setupWC?.showWindow()
     }
 
     @objc private func quitApp() {

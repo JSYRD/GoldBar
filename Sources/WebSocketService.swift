@@ -78,9 +78,13 @@ final class WebSocketService: NSObject {
     private func performConnect() {
         guard wantsConnection else { return }
 
+        guard let apiKey = Preferences.shared.apiKey else {
+            state = .error("请先配置 API Key")
+            return
+        }
+
         state = .connecting
 
-        let apiKey = Preferences.shared.apiKey
         var components = URLComponents(string: wsBaseURL)!
         components.queryItems = [URLQueryItem(name: "token", value: apiKey)]
 

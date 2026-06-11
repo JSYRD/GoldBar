@@ -45,6 +45,7 @@ SWIFT_FILES=(
     "$SOURCE_DIR/WebSocketService.swift"
     "$SOURCE_DIR/SetupWindowController.swift"
     "$SOURCE_DIR/SingleLineFormatter.swift"
+    "$SOURCE_DIR/KLineService.swift"
 )
 
 echo "  Compiling ${#SWIFT_FILES[@]} Swift files..."

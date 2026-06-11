@@ -16,6 +16,8 @@ final class Preferences {
         static let lastExchangeRateUpdate = "lastExchangeRateUpdate"
         static let refreshIntervalSeconds = "refreshIntervalSeconds"
         static let dataSourceMode = "dataSourceMode" // "http" or "websocket"
+        static let previousClose = "previousClose"
+        static let previousCloseDate = "previousCloseDate"
     }
 
     // MARK: - Default values
@@ -33,6 +35,21 @@ final class Preferences {
 
     /// Whether the user has configured an API key
     var hasAPIKey: Bool { apiKey != nil }
+
+    /// Previous trading day's closing price (USD/oz) — benchmark for change calculation
+    var previousClose: Double? {
+        get {
+            let val = defaults.double(forKey: Key.previousClose)
+            return val > 0 ? val : nil
+        }
+        set { defaults.set(newValue ?? 0, forKey: Key.previousClose) }
+    }
+
+    /// Date of the cached previous close
+    var previousCloseDate: Date? {
+        get { defaults.object(forKey: Key.previousCloseDate) as? Date }
+        set { defaults.set(newValue, forKey: Key.previousCloseDate) }
+    }
 
     /// Exchange rate mode: "auto" fetches from API, "manual" uses user-provided value
     var exchangeRateMode: String {

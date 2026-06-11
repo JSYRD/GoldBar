@@ -10,11 +10,13 @@ final class MenuBarController: NSObject {
     // MARK: - Services
     private let goldService = GoldPriceService()
     private let currencyService = CurrencyService()
+    private let klineService = KLineService()
     private let wsService = WebSocketService()
 
     // MARK: - UI
     private var statusItem: NSStatusItem!
     private var timer: Timer?
+    private var klineTimer: Timer?
     private var settingsWC: SettingsWindowController?
     private var setupWC: SetupWindowController?
 
@@ -25,8 +27,14 @@ final class MenuBarController: NSObject {
     private var currentMode: String = "http" // "http" or "websocket"
     private var wsConnectionState: WebSocketService.ConnectionState = .disconnected
 
+    /// Cached previous close for change calculation (refreshed every 30 min)
+    private var previousClose: Double?
+    /// Computed change percentage (positive = up, negative = down)
+    private var changePercent: Double?
+
     // MARK: - Menu items (updated dynamically)
     private let goldPriceItem = NSMenuItem(title: "金价: 加载中...", action: nil, keyEquivalent: "")
+    private let changeItem = NSMenuItem(title: "涨跌: --", action: nil, keyEquivalent: "")
     private let exchangeRateItem = NSMenuItem(title: "汇率: 加载中...", action: nil, keyEquivalent: "")
     private let updateTimeItem = NSMenuItem(title: "更新时间: --", action: nil, keyEquivalent: "")
 
@@ -43,8 +51,14 @@ final class MenuBarController: NSObject {
         observeSettingsChanges()
 
         if Preferences.shared.hasAPIKey {
+            // Restore cached reference price
+            previousClose = Preferences.shared.previousClose
             startDataFetching()
-            Task { await refreshExchangeRate() }
+            startKLineRefresh()
+            Task {
+                await refreshExchangeRate()
+                await refreshKLineReference()
+            }
         } else {
             statusItem.button?.title = "Au ⚙️"
             goldPriceItem.title = "金价: 请先配置 API Key"
@@ -72,6 +86,10 @@ final class MenuBarController: NSObject {
         // Gold price detail
         goldPriceItem.isEnabled = false
         menu.addItem(goldPriceItem)
+
+        // Change (↑↓)
+        changeItem.isEnabled = false
+        menu.addItem(changeItem)
 
         // Exchange rate detail
         exchangeRateItem.isEnabled = false
@@ -180,6 +198,8 @@ final class MenuBarController: NSObject {
     func stop() {
         NotificationCenter.default.removeObserver(self)
         stopDataFetching()
+        klineTimer?.invalidate()
+        klineTimer = nil
     }
 
     // MARK: - HTTP Polling mode
@@ -235,7 +255,6 @@ final class MenuBarController: NSObject {
 
     @objc private func refreshNow() {
         if currentMode == "websocket" {
-            // In WebSocket mode, reconnect to get fresh subscription
             wsService.disconnect()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.wsService.connect()
@@ -246,6 +265,8 @@ final class MenuBarController: NSObject {
                 await refreshExchangeRate(forceRefresh: true)
             }
         }
+        // Always refresh reference price
+        Task { await refreshKLineReference() }
     }
 
     private func refreshExchangeRate(forceRefresh: Bool = false) async {
@@ -262,17 +283,77 @@ final class MenuBarController: NSObject {
         }
     }
 
+    // MARK: - K-Line reference (daily close for change calculation)
+
+    /// Starts a timer that refreshes the previous-day close every 30 minutes.
+    /// The reference price only changes once per trading day, so this is generous.
+    private func startKLineRefresh() {
+        klineTimer?.invalidate()
+        klineTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
+            Task { await self?.refreshKLineReference() }
+        }
+    }
+
+    private func refreshKLineReference() async {
+        // Use cached value if available and data fetching hasn't started yet
+        if let cached = klineService.cachedReference() {
+            await MainActor.run {
+                previousClose = cached.previousClose
+                updateDisplayIfNeeded()
+            }
+        }
+        // Always try a network refresh to keep it current
+        do {
+            let ref = try await klineService.fetchReference()
+            await MainActor.run {
+                previousClose = ref.previousClose
+                updateDisplayIfNeeded()
+            }
+        } catch {
+            // Use cached value silently — it's only stale once per day
+        }
+    }
+
     // MARK: - Display
 
     private func updateDisplay(with result: GoldPriceResult) {
         let rate = Preferences.shared.effectiveExchangeRate()
         let rmbPerGram = result.priceUSDPerOunce * rate / Self.troyOunceToGrams
 
-        // Status bar: compact display
-        statusItem.button?.title = String(format: "Au ¥%.1f/g", rmbPerGram)
+        // Compute change if we have a reference close
+        if let prevClose = previousClose, prevClose > 0 {
+            changePercent = (result.priceUSDPerOunce - prevClose) / prevClose * 100.0
+        }
+
+        // Status bar: price + change arrow + percentage (colored)
+        if let chg = changePercent {
+            let arrow = chg >= 0 ? "↑" : "↓"
+            let color: NSColor = chg >= 0 ?
+                NSColor.systemGreen.blended(withFraction: 0.3, of: .black) ?? .systemGreen :
+                NSColor.systemRed
+            let title = String(format: "Au ¥%.1f/g \(arrow)%.2f%%", rmbPerGram, abs(chg))
+            statusItem.button?.attributedTitle = NSAttributedString(
+                string: title,
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(
+                        ofSize: NSFont.smallSystemFontSize, weight: .medium),
+                    .foregroundColor: color
+                ])
+        } else {
+            statusItem.button?.attributedTitle = NSAttributedString(
+                string: String(format: "Au ¥%.1f/g", rmbPerGram))
+        }
 
         // Menu items
         goldPriceItem.title = String(format: "黄金: $%.2f/oz (USD)", result.priceUSDPerOunce)
+
+        if let chg = changePercent, let prevClose = previousClose {
+            let arrow = chg >= 0 ? "↑" : "↓"
+            changeItem.title = String(format: "涨跌: \(arrow)%.2f%%   (昨收 $%.2f)", abs(chg), prevClose)
+        } else {
+            changeItem.title = "涨跌: 等待基准价..."
+        }
+
         exchangeRateItem.title = String(format: "汇率: %.4f USD/CNY", rate)
 
         let formatter = DateFormatter()
@@ -283,11 +364,18 @@ final class MenuBarController: NSObject {
 
     private func updateDisplayOnError() {
         if lastGoldResult == nil {
-            statusItem.button?.title = "Au --.-/g"
+            statusItem.button?.attributedTitle = NSAttributedString(string: "Au --.-/g")
         } else {
-            // Keep last known price but indicate staleness in menu
-            statusItem.button?.title = (statusItem.button?.title ?? "Au ⌛")
-                .replacingOccurrences(of: "Au ¥", with: "Au ⚠¥")
+            let title = statusItem.button?.attributedTitle.string ?? "Au --.-/g"
+            // Keep last known price but indicate staleness
+            let muted = NSAttributedString(
+                string: title.replacingOccurrences(of: "Au ¥", with: "Au ⚠¥"),
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(
+                        ofSize: NSFont.smallSystemFontSize, weight: .medium),
+                    .foregroundColor: NSColor.systemGray
+                ])
+            statusItem.button?.attributedTitle = muted
         }
         goldPriceItem.title = "金价: 获取失败"
         if let error = lastError {
@@ -350,8 +438,13 @@ final class MenuBarController: NSObject {
             setupWC = SetupWindowController()
         }
         setupWC?.onDismiss = { [weak self] in
+            self?.previousClose = Preferences.shared.previousClose
             self?.startDataFetching()
-            Task { await self?.refreshExchangeRate() }
+            self?.startKLineRefresh()
+            Task {
+                await self?.refreshExchangeRate()
+                await self?.refreshKLineReference()
+            }
         }
         setupWC?.showWindow()
     }

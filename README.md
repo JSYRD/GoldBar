@@ -1,24 +1,25 @@
 # GoldBar — Real-Time Gold Price Menu Bar App
 
-Display the current gold price in RMB per gram on your macOS menu bar.
+Display the current gold price in RMB per gram on your macOS menu bar, with daily change.
 
 ## Features
 
-- 🟡 **Real-time Gold Price** — Shows the latest gold price (RMB/g) in the menu bar
-- 🌐 **Auto Currency Conversion** — Automatically fetches USD/CNY exchange rate, converts USD/oz to RMB/g
-- ⚙️ **Configurable** — Change API key, switch exchange rate modes
-- 💾 **Low Resource Usage** — Runs silently in the background with periodic polling
-- 🔒 **Menu Bar Only** — No Dock icon, lives exclusively in the menu bar
+- 🟡 **Real-time Gold Price** — Latest price in RMB/g with ↑↓ change arrow and percentage
+- 📈 **Color Customization** — Western (green↑/red↓) or Chinese (red↑/green↓) convention
+- 🔄 **Dual Data Source** — HTTP polling (efficient) or WebSocket push (real-time)
+- 🌐 **Auto Currency Conversion** — Fetches USD/CNY rate, converts USD/oz to RMB/g
+- 🔤 **Adjustable Display** — Font size and baseline offset sliders
+- ⚙️ **No Hardcoded Key** — First-launch window prompts user for their own API key
+- 💾 **Low Resource Usage** — Silent background operation
+- 🔒 **Menu Bar Only** — No Dock icon
 
 ## Requirements
 
 - macOS 13.0 (Ventura) or later
-- Apple Silicon (M1/M2/M3/M4) or Intel Mac
+- Apple Silicon or Intel Mac
 - Internet connection
 
 ## Installation
-
-### Option 1: Run directly
 
 ```bash
 cd GoldBar
@@ -26,76 +27,71 @@ cd GoldBar
 open build/GoldBar.app
 ```
 
-### Option 2: Move to Applications
-
-After building, drag `build/GoldBar.app` to your `/Applications/` folder.
-
-### Auto-launch at Login (optional)
-
-1. Open System Settings → General → Login Items & Extensions
-2. Click "+" and add GoldBar.app
+Optionally drag `build/GoldBar.app` to `/Applications/`.
 
 ## Usage
 
+### First Launch
+
+A setup window will appear. Paste your AllTick API key (get one free at [alltick.co](https://alltick.co)) and click "开始使用". The key is stored locally — you won't need to enter it again.
+
 ### Menu Bar Display
 
-After launch, you'll see something like this in the top-right menu bar:
-
 ```
-Au ¥895.2/g
+Au ¥895.2/g ↑0.50%    ← colored: green(up) / red(down), or swap via settings
 ```
 
-- `Au` — Gold chemical symbol
-- `¥895.2/g` — RMB price per gram of gold
-
-### Menu Items
-
-Click the menu bar item to see:
+### Dropdown Menu
 
 | Item | Description |
 |------|-------------|
-| Gold: $XXXX.XX/oz | Raw USD per troy ounce price |
-| Rate: X.XXXX USD/CNY | Current exchange rate in use |
-| Updated: HH:MM:SS | Time of last successful fetch |
-| Refresh Now (`⌘R`) | Manually trigger a data refresh |
-| Settings... (`⌘,`) | Open the settings window |
-| Quit GoldBar (`⌘Q`) | Quit the application |
+| Gold: $XXXX.XX/oz | Raw USD/oz price |
+| Change: ↑↓X.XX% (prev close $XXXX) | Daily change vs previous close |
+| Rate: X.XXXX USD/CNY | Current exchange rate |
+| Updated: HH:MM:SS | Last successful fetch time |
+| **Data Source** ▸ | Submenu: HTTP Polling / WebSocket Push |
+| **Color Scheme** ▸ | Submenu: Green↑Red↓ (Western) / Red↑Green↓ (Chinese) |
+| Refresh Now (`⌘R`) | Force refresh |
+| Settings... (`⌘,`) | Open settings window |
+| Quit GoldBar (`⌘Q`) | Quit |
 
 ### Settings
 
-The settings window allows you to configure:
-
-- **API Key** — Your AllTick platform API token. A free key is pre-configured
-- **Exchange Rate Mode**
-  - *Auto (recommended)* — Fetches USD/CNY rate from free API every hour
-  - *Manual* — Use a fixed exchange rate of your choice
-- **Manual Rate** — Only enabled in manual mode; enter your desired USD/CNY rate
-
-Click "Save" to apply changes immediately.
+| Setting | Description |
+|---------|-------------|
+| API Key | Your AllTick API token |
+| Data Source | HTTP (every 15s) or WebSocket (real-time push) |
+| Font Size | Menu bar text size (8–18 pt) |
+| Baseline Offset | Vertical alignment tweak (-4.0–+4.0 pt) |
+| Rate Mode | Auto-fetch (hourly) or manual fixed rate |
+| Manual Rate | Only used in manual mode |
 
 ## Data Sources
 
-- **Gold Price**: [AllTick](https://alltick.co) Financial Data API — Real-time precious metals quotes
-- **USD Exchange Rate**: [Exchange Rate API](https://open.er-api.com) — Free currency exchange rates
+- **Gold Price**: [AllTick](https://alltick.co) — Real-time precious metals API
+- **Previous Close**: Same API, daily K-line (`kline_type=8`) for change calculation
+- **Exchange Rate**: [Exchange Rate API](https://open.er-api.com) — Free currency data
 
 ## Price Calculation
 
 ```
-RMB/g = (USD/oz × USD/CNY rate) ÷ 31.1034768
+RMB/g     = (USD/oz × USD/CNY rate) ÷ 31.1034768
+Change %  = (current - prev_close) ÷ prev_close × 100%
 ```
-
-Where `31.1034768` is the number of grams in one troy ounce.
 
 ## FAQ
 
+### Q: Why does it ask for an API key on first launch?
+A: GoldBar does not ship with a built-in key. Register for free at [alltick.co](https://alltick.co) and paste your token.
+
 ### Q: The price shows `--.-/g`. What's wrong?
-A: Unable to fetch gold price. Check:
-1. Network connection
-2. API Key validity in Settings
-3. API rate limits (free tier: 10 requests/minute)
+A: Check your network, API key validity, and rate limits (free tier: 10 req/min).
 
-### Q: How often does the exchange rate update?
-A: In auto mode, once per hour. You can also manually set a fixed rate in Settings.
+### Q: HTTP vs WebSocket?
+A: HTTP polls every 15 seconds (lower resource usage). WebSocket maintains a persistent connection for near-instant updates. Switch anytime via the "Data Source" submenu.
 
-### Q: How do I get my own API Key?
-A: Visit [AllTick official website](https://alltick.co) to register and obtain an API token.
+### Q: No change percentage showing?
+A: The previous day's close needs to be fetched first. It should appear within seconds of the first price update.
+
+### Q: The up/down colors look wrong?
+A: Toggle between Western (green↑) and Chinese (red↑) convention in the "Color Scheme" submenu.

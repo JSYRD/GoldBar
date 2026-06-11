@@ -4,308 +4,207 @@
 
 ```
 GoldBar/
-├── Sources/                          # Swift source code
-│   ├── main.swift                    # App entry point
-│   ├── AppDelegate.swift             # NSApplicationDelegate implementation
-│   ├── Preferences.swift             # UserDefaults wrapper
-│   ├── GoldPriceService.swift        # AllTick gold price API service
-│   ├── CurrencyService.swift         # Exchange rate API service
-│   ├── MenuBarController.swift       # Menu bar UI controller
-│   └── SettingsWindowController.swift # Settings window controller
+├── Sources/
+│   ├── main.swift                        # App entry point (NSApplication + .accessory)
+│   ├── AppDelegate.swift                 # NSApplicationDelegate + main menu setup
+│   ├── Preferences.swift                 # UserDefaults type-safe wrapper
+│   ├── GoldPriceService.swift            # AllTick HTTP REST: GET /trade-tick
+│   ├── WebSocketService.swift            # AllTick WebSocket: wss:// push + heartbeat
+│   ├── KLineService.swift                # AllTick POST /batch-kline (daily reference)
+│   ├── CurrencyService.swift             # Free exchange rate API (open.er-api.com)
+│   ├── MenuBarController.swift           # NSStatusItem + menu + dual-mode orchestration
+│   ├── SettingsWindowController.swift     # Code-only settings window (NSStackView)
+│   ├── SetupWindowController.swift       # First-launch API key configuration
+│   └── SingleLineFormatter.swift         # Formatter that strips newlines
 ├── Resources/
-│   └── Info.plist                    # App bundle metadata
-├── build.sh                          # Build script
-├── README.md                         # User docs (English)
-├── README_CN.md                      # User docs (Chinese)
-├── DEVELOPER.md                      # Developer docs (English)
-├── DEVELOPER_CN.md                   # Developer docs (Chinese)
-└── alltick-api/                      # AllTick API docs (reference only)
+│   └── Info.plist                        # LSUIElement=true, bundle metadata
+├── build.sh                              # swiftc → .app bundle → ad-hoc sign
+├── README.md / README_CN.md             # User documentation
+└── DEVELOPER.md / DEVELOPER_CN.md        # Developer documentation
 ```
 
-## Architecture Design
-
-GoldBar follows a simple **Service-Controller** architecture:
+## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   AppDelegate                    │
-│         (NSApplicationDelegate)                  │
-└─────────────────────┬───────────────────────────┘
-                      │ Creates
-         ┌────────────▼────────────┐
-         │   MenuBarController      │
-         │  (State & UI)            │
-         │                         │
-         │  • NSStatusItem          │
-         │  • NSMenu                │
-         │  • Timer (polling)       │
-         └──────┬─────────┬────────┘
-                │         │
-      ┌─────────▼──┐  ┌──▼──────────┐
-      │ GoldPrice  │  │ Currency     │
-      │ Service    │  │ Service      │
-      │            │  │              │
-      │ AllTick    │  │ open.er-api  │
-      │ API        │  │ .com         │
-      └────────────┘  └──────────────┘
-                │         │
-      ┌─────────▼──┐  ┌──▼──────────┐
-      │ Preferences │  │ Preferences │
-      │ (API Key)   │  │ (Rate mode, │
-      │             │  │  cached val)│
-      └────────────┘  └──────────────┘
-                      │
-              ┌───────▼────────┐
-              │  SettingsWindow │
-              │  Controller     │
-              │  (Settings UI)  │
-              └────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                     AppDelegate                          │
+│   • setupMainMenu() — Edit menu for ⌘V paste support    │
+│   • Creates MenuBarController                           │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+          ┌────────────▼──────────────┐
+          │    MenuBarController       │
+          │  ┌─────────────────────┐  │
+          │  │ NSStatusItem         │  │
+          │  │ NSMenu + submenus    │  │
+          │  │ Timer (HTTP mode)    │  │
+          │  └─────────────────────┘  │
+          │                           │
+          │  startDataFetching()       │
+          │    ├─ HTTP → Timer → GoldPriceService
+          │    └─ WS   → WebSocketService.connect()
+          │                           │
+          │  refreshKLineReference()   │
+          │    └─ KLineService (30min) │
+          └──────┬─────────┬──────────┘
+                 │         │
+    ┌────────────▼──┐  ┌──▼─────────────┐  ┌─────────────┐
+    │ GoldPriceService│  │ WebSocketService│  │ KLineService │
+    │ GET /trade-tick │  │ wss:// + 22004  │  │ POST /batch- │
+    │ → price USD/oz  │  │ → push 22998    │  │ kline type=8  │
+    └────────────────┘  └────────────────┘  │ → prev close  │
+                                            └─────────────┘
+                       │
+    ┌──────────────────▼──────────────────┐
+    │          Preferences                 │
+    │  apiKey, dataSourceMode, fontSize,   │
+    │  baselineOffset, colorScheme,        │
+    │  previousClose, exchangeRate…        │
+    └─────────────────────────────────────┘
+                       │
+    ┌──────────────────▼──────────────────┐
+    │   SettingsWindowController           │
+    │   SetupWindowController              │
+    └─────────────────────────────────────┘
 ```
 
-### Core Components
+## Core Components
 
-#### 1. `MenuBarController`
-The "brain" of the application. Responsibilities:
-- Creates and manages `NSStatusItem`
-- Polls gold price via Timer (default: every 15 seconds)
-- Updates menu bar display and dropdown menu
-- Handles user interactions (refresh, settings, quit)
+### `MenuBarController`
+Central orchestrator. Manages NSStatusItem, builds the menu hierarchy (including data source and color scheme submenus), and coordinates two data-fetching modes:
+- **HTTP mode**: `Timer` → `GoldPriceService.fetchPrice()` every 15s
+- **WebSocket mode**: `WebSocketService.connect()` → push-driven updates
 
-#### 2. `GoldPriceService`
-Encapsulates AllTick gold price API calls:
+Also manages periodic K-line reference fetches (every 30 min) for change calculation.
+
+### `GoldPriceService`
+REST client for AllTick `/trade-tick`:
 - Endpoint: `GET https://quote.alltick.co/quote-b-api/trade-tick`
-- Params: `token` (API key) + `query` (URL-encoded JSON)
-- Returns: `GoldPriceResult` (price in USD/oz, timestamp, sequence)
-- Error handling: Network, HTTP, and API-level errors mapped to `GoldPriceError`
+- Query: `?token=<key>&query=<url-encoded JSON with GOLD code>`
+- Returns: `GoldPriceResult { priceUSDPerOunce, tickTime, seq }`
+- Errors mapped to `GoldPriceError` (including `.missingAPIKey`)
 
-#### 3. `CurrencyService`
-Encapsulates free exchange rate API calls:
-- Endpoint: `GET https://open.er-api.com/v6/latest/USD`
-- Cache strategy: Reuses cached value within 1 hour
-- Supports `forceRefresh` for immediate update
+### `WebSocketService`
+Real-time push client using `URLSessionWebSocketTask`:
+- Connect: `wss://quote.alltick.co/quote-b-ws-api?token=<key>`
+- Heartbeat: `{"cmd_id":22000}` every 10s (server disconnects after 30s silence)
+- Subscribe: `{"cmd_id":22004, "symbol_list":[{"code":"GOLD"}]}`
+- Push data: `{"cmd_id":22998, "data":{"price":"...", "tick_time":"...", ...}}`
+- Auto-reconnect with exponential backoff (2s → 60s max)
+- Callbacks: `onPriceUpdate`, `onConnectionStateChange`
 
-#### 4. `Preferences`
-Type-safe wrapper around UserDefaults:
-- `apiKey` — AllTick API token
-- `exchangeRateMode` — "auto" or "manual"
-- `manualExchangeRate` — User-specified exchange rate
-- `lastExchangeRate` / `lastExchangeRateUpdate` — Cached rate + timestamp
-- `refreshInterval` — Polling interval in seconds
+### `KLineService`
+Fetches previous trading day's closing price for change calculation:
+- Endpoint: `POST https://quote.alltick.co/quote-b-api/batch-kline`
+- Body: `kline_type=8` (daily), `query_kline_num=2` (last 2 bars)
+- Extracts `kline_data[0].close_price` = yesterday's close (reference)
+- Caches result to `Preferences.previousClose`
 
-#### 5. `SettingsWindowController`
-Code-only settings window (no Storyboard/XIB):
-- NSLayoutConstraint-based auto layout
-- Save/cancel operations
-- Live reflection of setting changes
+### `Preferences`
+Type-safe UserDefaults wrapper. All properties persist locally in `~/Library/Preferences/com.goldbar.app.plist`.
+
+### `SetupWindowController`
+First-launch API key entry. Promotes the app to `.regular` activation policy temporarily so ⌘V paste works. On save, demotes back to `.accessory` and triggers data fetching.
+
+### `SingleLineFormatter`
+Custom `Formatter` that strips `\n` and `\r` from both typed and pasted text via `isPartialStringValid`. Applied to all single-line text fields.
 
 ## Data Flow
 
+### HTTP Polling Mode
 ```
-Timer fires (every 15 s)
-    │
-    ▼
-GoldPriceService.fetchPrice()
-    │
-    │  GET /quote-b-api/trade-tick?token=...&query=...
-    │
-    ▼
-GoldPriceResult { priceUSDPerOunce, tickTime, seq }
-    │
-    ▼
-Preferences.effectiveExchangeRate()
-    │
-    │  auto → cached rate (fetches via CurrencyService if expired)
-    │  manual → user-provided value
-    │
-    ▼
-Computation: RMB/g = USD/oz × rate ÷ 31.1034768
-    │
-    ▼
-UI Update:
-  • statusItem.button?.title = "Au ¥XXX.X/g"
-  • Dropdown menu item details
+Timer (15s)
+  → GoldPriceService.fetchPrice()       // GET /trade-tick
+  → GoldPriceResult (USD/oz)
+  → Preferences.effectiveExchangeRate() // USD→RMB conversion
+  → KLineService cached previousClose   // change calculation
+  → updateDisplay()                     // NSAttributedString with color
+  → NSStatusItem.button.attributedTitle
 ```
 
-## Building
+### WebSocket Push Mode
+```
+WebSocketService.connect()
+  → [heartbeat loop]
+  → subscribe (cmd_id=22004)
+  → push received (cmd_id=22998)
+  → onPriceUpdate callback
+  → MenuBarController.updateDisplay()
+```
+
+### K-Line Reference (shared by both modes)
+```
+Timer (30min) or startup
+  → KLineService.fetchReference()       // POST /batch-kline
+  → DailyReference { previousClose }
+  → Preferences.previousClose = close
+  → changePercent = (current - prevClose) / prevClose × 100%
+```
+
+## Build
 
 ### Prerequisites
+- macOS 13.0+, Xcode 15.0+ or Command Line Tools (`swiftc`)
 
-- macOS 13.0+
-- Xcode 15.0+ or Command Line Tools (provides `swiftc`)
-- Install Command Line Tools: `xcode-select --install`
-
-### Build Commands
-
+### Commands
 ```bash
-# Debug build (with symbols)
-./build.sh
-
-# Release build (optimized)
-./build.sh release
-
-# Build and launch
-./build.sh run
+./build.sh          # Debug build
+./build.sh release  # Optimized build
+./build.sh run      # Build + launch
 ```
 
-### Build Script Details
-
-`build.sh` performs the following steps:
-
-1. **Compile** — Uses `swiftc` to compile all `.swift` files into a single binary
-2. **Bundle** — Creates the `.app` bundle structure:
-   ```
-   GoldBar.app/
-   └── Contents/
-       ├── Info.plist
-       ├── PkgInfo
-       └── MacOS/
-           └── GoldBar          # Executable
-   ```
-3. **Sign** — Ad-hoc code signing (required for local execution)
-4. **Launch** (optional) — `./build.sh run`
-
-### Build Options
-
-| Mode | Swift Flags | Output |
-|------|------------|--------|
-| debug | `-Onone -g` | `build/GoldBar.app` |
-| release | `-O -whole-module-optimization` | `build/GoldBar.app` |
+### Build Script Steps
+1. `swiftc` compiles all `.swift` files → single `GoldBar` binary (arm64)
+2. Creates `.app` bundle structure with Info.plist + PkgInfo
+3. Ad-hoc code sign (`codesign --sign -`)
 
 ## API Reference
 
-### AllTick Gold Price API
-
+### AllTick `/trade-tick` (REST)
 ```
 GET https://quote.alltick.co/quote-b-api/trade-tick
   ?token=<api_key>
-  &query=<url_encoded_json>
+  &query=%7B%22trace%22%3A%22...%22%2C%22data%22%3A%7B%22symbol_list%22%3A%5B%7B%22code%22%3A%22GOLD%22%7D%5D%7D%7D
+```
+Returns: `{ ret: 200, data: { tick_list: [{ price: "4101.91", ... }] } }`
+
+### AllTick `/batch-kline` (REST)
+```
+POST https://quote.alltick.co/quote-b-api/batch-kline?token=<key>
+Body: { data: { data_list: [{ code: "GOLD", kline_type: 8, query_kline_num: 2 }] } }
+```
+Returns: 2 daily K-lines → `[0].close_price` = previous close (benchmark).
+
+### AllTick WebSocket
+```
+wss://quote.alltick.co/quote-b-ws-api?token=<key>
+  → send: { cmd_id: 22000, ... }  // heartbeat every 10s
+  → send: { cmd_id: 22004, data: { symbol_list: [{ code: "GOLD" }] } }
+  → recv: { cmd_id: 22998, data: { price: "4101.91", ... } }  // push
 ```
 
-**Query JSON format:**
-```json
-{
-  "trace": "<uuid>",
-  "data": {
-    "symbol_list": [{"code": "GOLD"}]
-  }
-}
-```
-
-**Success response (200):**
-```json
-{
-  "ret": 200,
-  "msg": "ok",
-  "data": {
-    "tick_list": [{
-      "code": "GOLD",
-      "seq": "24618487",
-      "tick_time": "1781166146694",   // Millisecond timestamp
-      "price": "4101.91",             // USD/troy ounce
-      "volume": "8.00",
-      "turnover": "32815.28",
-      "trade_direction": 1
-    }]
-  }
-}
-```
-
-**Error codes:**
-| ret | Meaning |
-|-----|---------|
-| 200 | Success |
-| 202 | Invalid parameter |
-| 403 | Invalid token |
-| 429 | Rate limited |
-| 604 | Code unauthorized |
-
-### Free Exchange Rate API
-
+### Exchange Rate API
 ```
 GET https://open.er-api.com/v6/latest/USD
+→ { rates: { CNY: 6.789317 } }
 ```
+Cached for 1 hour.
 
-**Response:**
-```json
-{
-  "result": "success",
-  "time_last_update_utc": "Thu, 11 Jun 2026 00:02:31 +0000",
-  "rates": {
-    "CNY": 6.789317,
-    ...
-  }
-}
-```
+## Preferences Reference
 
-## Extension Guide
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `apiKey` | String? | `nil` | AllTick API token |
+| `dataSourceMode` | String | `"http"` | `"http"` or `"websocket"` |
+| `colorScheme` | String | `"western"` | `"western"` (green↑) or `"chinese"` (red↑) |
+| `fontSize` | Double | 11 | Menu bar font size (8–18 pt) |
+| `baselineOffset` | Double | -0.5 | Vertical alignment offset (-4.0–+4.0) |
+| `exchangeRateMode` | String | `"auto"` | `"auto"` or `"manual"` |
+| `previousClose` | Double? | `nil` | Yesterday's gold close (USD/oz) |
 
-### Adding New Precious Metals
+## Extension Points
 
-1. Add the new symbol to the query in `GoldPriceService.swift` (e.g., `SILVER`, `PLATINUM`)
-2. Or support batch queries with multiple codes:
-   ```swift
-   "symbol_list": [{"code": "GOLD"}, {"code": "SILVER"}]
-   ```
-3. Update `MenuBarController` display logic accordingly
-
-### Adding Other Display Units
-
-Modify the conversion formula in `MenuBarController.updateDisplay(with:)`:
-```swift
-// Current: RMB/gram
-let value = result.priceUSDPerOunce * rate / troyOunceToGrams
-
-// Optional: RMB/oz
-let value = result.priceUSDPerOunce * rate
-
-// Optional: USD/g
-let value = result.priceUSDPerOunce / troyOunceToGrams
-```
-
-### Adding WebSocket Support
-
-AllTick also provides WebSocket real-time streaming. For faster updates:
-1. Reference the docs in `alltick-api/websocket_interface/`
-2. Create `WebSocketService.swift` using `URLSessionWebSocketTask`
-3. Replace the Timer in `MenuBarController` with WebSocket subscription
-
-## Testing
-
-### API Test Scripts
-
-```bash
-# Test gold price API
-QUERY=$(python3 -c "
-import json, urllib.parse
-data = {
-    'trace': 'test-001',
-    'data': {
-        'symbol_list': [{'code': 'GOLD'}]
-    }
-}
-print(urllib.parse.quote(json.dumps(data)))
-")
-curl -s "https://quote.alltick.co/quote-b-api/trade-tick?token=YOUR_API_KEY&query=$QUERY" | python3 -m json.tool
-
-# Test exchange rate API
-curl -s "https://open.er-api.com/v6/latest/USD" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-print(f'USD/CNY: {d[\"rates\"][\"CNY\"]}')
-"
-```
-
-### Manual Test Checklist
-
-- [ ] App launches and displays gold price in menu bar
-- [ ] Dropdown menu shows price, rate, and time correctly
-- [ ] "Refresh Now" triggers a data update
-- [ ] Settings window opens correctly
-- [ ] Changing API key takes effect
-- [ ] Switching exchange rate mode (auto ↔ manual) works
-- [ ] Manual exchange rate value produces correct price conversion
-- [ ] "Quit GoldBar" exits cleanly
-
-## License
-
-This project is for personal use.
+- **Add more metals**: add codes to `symbol_list` in GoldPriceService / WebSocketService
+- **Change display units**: modify the conversion formula in `MenuBarController.updateDisplay()`
+- **Add notification**: use `NSUserNotification` or `UserNotifications` framework on price threshold
+- **Custom K-line type**: change `kline_type` in KLineService (e.g., weekly = 9 for weekly change)

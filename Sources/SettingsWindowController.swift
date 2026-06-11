@@ -21,6 +21,10 @@ final class SettingsWindowController: NSObject {
     private let manualRateField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
 
+    /// Captured slider values — decoupled from NSSlider's internal state
+    private var pendingFontSize: Double = Preferences.defaultFontSize
+    private var pendingBaselineOffset: Double = Preferences.defaultBaselineOffset
+
     func showWindow() {
         if window == nil {
             buildWindow()
@@ -235,10 +239,12 @@ final class SettingsWindowController: NSObject {
         apiKeyField.placeholderString = prefs.hasAPIKey
             ? "输入你的 AllTick API Key"
             : "⚠️ 请先粘贴你的 AllTick API Key 以开始使用"
-        fontSizeSlider.doubleValue = prefs.fontSize
-        fontSizeLabel.stringValue = String(format: "%.0f pt", prefs.fontSize)
-        baselineSlider.doubleValue = prefs.baselineOffset
-        baselineLabel.stringValue = String(format: "%+.1f pt", prefs.baselineOffset)
+        pendingFontSize = prefs.fontSize
+        pendingBaselineOffset = prefs.baselineOffset
+        fontSizeSlider.doubleValue = pendingFontSize
+        fontSizeLabel.stringValue = String(format: "%.0f pt", pendingFontSize)
+        baselineSlider.doubleValue = pendingBaselineOffset
+        baselineLabel.stringValue = String(format: "%+.1f pt", pendingBaselineOffset)
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
@@ -273,15 +279,14 @@ final class SettingsWindowController: NSObject {
     }
 
     @objc private func fontSizeChanged() {
-        let size = fontSizeSlider.doubleValue.rounded()
-        fontSizeSlider.doubleValue = size  // snap to integer
-        fontSizeLabel.stringValue = String(format: "%.0f pt", size)
+        // Only capture — don't write back to slider (avoids re-entrancy)
+        pendingFontSize = fontSizeSlider.doubleValue.rounded()
+        fontSizeLabel.stringValue = String(format: "%.0f pt", pendingFontSize)
     }
 
     @objc private func baselineChanged() {
-        let val = (baselineSlider.doubleValue * 2.0).rounded() / 2.0  // snap to 0.5
-        baselineSlider.doubleValue = val
-        baselineLabel.stringValue = String(format: "%+.1f pt", val)
+        pendingBaselineOffset = (baselineSlider.doubleValue * 2.0).rounded() / 2.0
+        baselineLabel.stringValue = String(format: "%+.1f pt", pendingBaselineOffset)
     }
 
     @objc private func saveSettings() {
@@ -298,8 +303,8 @@ final class SettingsWindowController: NSObject {
 
         prefs.apiKey = newKey
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
-        prefs.fontSize = fontSizeSlider.doubleValue
-        prefs.baselineOffset = baselineSlider.doubleValue
+        prefs.fontSize = pendingFontSize
+        prefs.baselineOffset = pendingBaselineOffset
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

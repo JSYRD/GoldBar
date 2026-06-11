@@ -28,7 +28,11 @@ final class MenuBarController: NSObject {
     private let goldPriceItem = NSMenuItem(title: "金价: 加载中...", action: nil, keyEquivalent: "")
     private let exchangeRateItem = NSMenuItem(title: "汇率: 加载中...", action: nil, keyEquivalent: "")
     private let updateTimeItem = NSMenuItem(title: "更新时间: --", action: nil, keyEquivalent: "")
-    private let dataSourceItem = NSMenuItem(title: "数据源: --", action: nil, keyEquivalent: "")
+
+    // Data source submenu
+    private let dataSourceSubmenu = NSMenu()
+    private let httpModeItem = NSMenuItem(title: "HTTP 轮询", action: #selector(switchToHTTP), keyEquivalent: "")
+    private let wsModeItem = NSMenuItem(title: "WebSocket 实时推送", action: #selector(switchToWebSocket), keyEquivalent: "")
 
     // MARK: - Init
     override init() {
@@ -65,13 +69,19 @@ final class MenuBarController: NSObject {
         updateTimeItem.isEnabled = false
         menu.addItem(updateTimeItem)
 
-        // Data source mode
-        dataSourceItem.isEnabled = false
-        menu.addItem(dataSourceItem)
-
         menu.addItem(NSMenuItem.separator())
 
-        // Refresh Now (only relevant for HTTP mode)
+        // Data source submenu
+        httpModeItem.target = self
+        wsModeItem.target = self
+        dataSourceSubmenu.addItem(httpModeItem)
+        dataSourceSubmenu.addItem(wsModeItem)
+
+        let dataSourceSubmenuItem = NSMenuItem(title: "数据源", action: nil, keyEquivalent: "")
+        dataSourceSubmenuItem.submenu = dataSourceSubmenu
+        menu.addItem(dataSourceSubmenuItem)
+
+        // Refresh Now
         let refreshItem = NSMenuItem(
             title: "立即刷新", action: #selector(refreshNow), keyEquivalent: "r")
         refreshItem.target = self
@@ -281,25 +291,39 @@ final class MenuBarController: NSObject {
     }
 
     private func updateDataSourceItem() {
-        let modeLabel = currentMode == "websocket" ? "WebSocket" : "HTTP 轮询"
+        // Checkmark: indicate which mode is active
+        httpModeItem.state = (currentMode == "http") ? .on : .off
+        wsModeItem.state = (currentMode == "websocket") ? .on : .off
 
+        // Append connection status to WebSocket item
         switch wsConnectionState {
         case .connected:
-            dataSourceItem.title = "数据源: \(modeLabel) ✅"
+            wsModeItem.title = "WebSocket 实时推送 ✅"
         case .connecting:
-            dataSourceItem.title = "数据源: \(modeLabel) ⏳"
+            wsModeItem.title = "WebSocket 实时推送 ⏳"
         case .disconnected:
-            if currentMode == "websocket" {
-                dataSourceItem.title = "数据源: \(modeLabel) ❌ (自动重连中)"
-            } else {
-                dataSourceItem.title = "数据源: \(modeLabel)"
-            }
+            wsModeItem.title = "WebSocket 实时推送"
         case .error(let msg):
-            dataSourceItem.title = "数据源: \(modeLabel) ❌ \(msg)"
+            wsModeItem.title = "WebSocket 实时推送 ❌ \(msg)"
         }
+
+        // HTTP item is always clean
+        httpModeItem.title = "HTTP 轮询"
     }
 
     // MARK: - Actions
+
+    @objc private func switchToHTTP() {
+        guard currentMode != "http" else { return }
+        Preferences.shared.dataSourceMode = "http"
+        restartDataFetching()
+    }
+
+    @objc private func switchToWebSocket() {
+        guard currentMode != "websocket" else { return }
+        Preferences.shared.dataSourceMode = "websocket"
+        restartDataFetching()
+    }
 
     @objc private func openSettings() {
         if settingsWC == nil {

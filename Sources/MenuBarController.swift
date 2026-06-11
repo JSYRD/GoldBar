@@ -6,6 +6,7 @@ final class MenuBarController: NSObject {
 
     // MARK: - Constants
     private static let troyOunceToGrams = 31.1034768
+    private static let textBaselineOffset: CGFloat = -0.5
 
     /// Current font size from preferences — use this everywhere instead of a hardcoded value
     private var statusFont: NSFont {
@@ -355,11 +356,13 @@ final class MenuBarController: NSObject {
                 string: title,
                 attributes: [
                     .font: statusFont,
-                    .foregroundColor: color
+                    .foregroundColor: color,
+                    .baselineOffset: Self.textBaselineOffset
                 ])
         } else {
             statusItem.button?.attributedTitle = NSAttributedString(
-                string: String(format: "Au ¥%.1f/g", rmbPerGram))
+                string: String(format: "Au ¥%.1f/g", rmbPerGram),
+                attributes: [.baselineOffset: Self.textBaselineOffset])
         }
 
         // Menu items
@@ -382,15 +385,17 @@ final class MenuBarController: NSObject {
 
     private func updateDisplayOnError() {
         if lastGoldResult == nil {
-            statusItem.button?.attributedTitle = NSAttributedString(string: "Au --.-/g")
+            statusItem.button?.attributedTitle = NSAttributedString(
+                string: "Au --.-/g",
+                attributes: [.baselineOffset: Self.textBaselineOffset])
         } else {
             let title = statusItem.button?.attributedTitle.string ?? "Au --.-/g"
-            // Keep last known price but indicate staleness
             let muted = NSAttributedString(
                 string: title.replacingOccurrences(of: "Au ¥", with: "Au ⚠¥"),
                 attributes: [
                     .font: statusFont,
-                    .foregroundColor: NSColor.systemGray
+                    .foregroundColor: NSColor.systemGray,
+                    .baselineOffset: Self.textBaselineOffset
                 ])
             statusItem.button?.attributedTitle = muted
         }

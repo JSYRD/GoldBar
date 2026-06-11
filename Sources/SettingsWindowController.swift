@@ -256,7 +256,7 @@ final class SettingsWindowController: NSObject {
     }
 
     @objc private func fontSizeChanged() {
-        let size = fontSizeSlider.doubleValue
+        let size = round(fontSizeSlider.doubleValue)
         fontSizeLabel.stringValue = String(format: "%.0f pt", size)
     }
 
@@ -274,7 +274,7 @@ final class SettingsWindowController: NSObject {
 
         prefs.apiKey = newKey
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
-        prefs.fontSize = fontSizeSlider.doubleValue
+        prefs.fontSize = round(fontSizeSlider.doubleValue)
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

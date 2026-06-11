@@ -19,11 +19,15 @@ final class Preferences {
         static let previousClose = "previousClose"
         static let previousCloseDate = "previousCloseDate"
         static let colorScheme = "colorScheme" // "western" (green↑/red↓) or "chinese" (red↑/green↓)
+        static let fontSize = "fontSize"
     }
 
     // MARK: - Default values
     static let defaultExchangeRate: Double = 6.79
     static let defaultRefreshInterval: TimeInterval = 15.0
+    static let minFontSize: Double = 8.0
+    static let maxFontSize: Double = 18.0
+    static let defaultFontSize: Double = 11.0
 
     /// AllTick API key (token). Returns nil if not yet configured.
     var apiKey: String? {
@@ -38,6 +42,21 @@ final class Preferences {
     var colorScheme: String {
         get { defaults.string(forKey: Key.colorScheme) ?? "western" }
         set { defaults.set(newValue, forKey: Key.colorScheme) }
+    }
+
+    /// Status bar font size (pt). Clamped to minFontSize...maxFontSize.
+    var fontSize: Double {
+        get {
+            let val = defaults.double(forKey: Key.fontSize)
+            guard val >= Self.minFontSize, val <= Self.maxFontSize else {
+                return Self.defaultFontSize
+            }
+            return val
+        }
+        set {
+            let clamped = min(max(newValue, Self.minFontSize), Self.maxFontSize)
+            defaults.set(clamped, forKey: Key.fontSize)
+        }
     }
 
     /// Whether the user has configured an API key

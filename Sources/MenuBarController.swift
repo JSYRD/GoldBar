@@ -7,6 +7,12 @@ final class MenuBarController: NSObject {
     // MARK: - Constants
     private static let troyOunceToGrams = 31.1034768
 
+    /// Current font size from preferences — use this everywhere instead of a hardcoded value
+    private var statusFont: NSFont {
+        let size = Preferences.shared.fontSize
+        return NSFont.monospacedDigitSystemFont(ofSize: size, weight: .medium)
+    }
+
     // MARK: - Services
     private let goldService = GoldPriceService()
     private let currencyService = CurrencyService()
@@ -82,8 +88,7 @@ final class MenuBarController: NSObject {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "Au ⌛"
-        statusItem.button?.font = NSFont.monospacedDigitSystemFont(
-            ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        statusItem.button?.font = statusFont
 
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -349,8 +354,7 @@ final class MenuBarController: NSObject {
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: title,
                 attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(
-                        ofSize: NSFont.smallSystemFontSize, weight: .medium),
+                    .font: statusFont,
                     .foregroundColor: color
                 ])
         } else {
@@ -385,8 +389,7 @@ final class MenuBarController: NSObject {
             let muted = NSAttributedString(
                 string: title.replacingOccurrences(of: "Au ¥", with: "Au ⚠¥"),
                 attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(
-                        ofSize: NSFont.smallSystemFontSize, weight: .medium),
+                    .font: statusFont,
                     .foregroundColor: NSColor.systemGray
                 ])
             statusItem.button?.attributedTitle = muted

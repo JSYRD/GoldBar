@@ -13,6 +13,8 @@ final class SettingsWindowController: NSObject {
     // MARK: - Controls
     private let apiKeyField = NSTextField(frame: .zero)
     private let dataSourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let fontSizeSlider = NSSlider(frame: .zero)
+    private let fontSizeLabel = NSTextField(labelWithString: "11 pt")
     private let rateModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let manualRateField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
@@ -29,7 +31,7 @@ final class SettingsWindowController: NSObject {
 
     private func buildWindow() {
         let width: CGFloat = 480
-        let height: CGFloat = 310
+        let height: CGFloat = 350
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -64,6 +66,20 @@ final class SettingsWindowController: NSObject {
             "WebSocket 实时推送 (秒级更新)"
         ])
         dataSourcePopup.toolTip = "HTTP: 定时拉取数据，节省资源。WebSocket: 长连接实时推送，更新更快"
+
+        // --- Font size slider ---
+        let fontSizeLabelLeft = makeLabel("显示大小:")
+        fontSizeSlider.minValue = Preferences.minFontSize
+        fontSizeSlider.maxValue = Preferences.maxFontSize
+        fontSizeSlider.doubleValue = Preferences.shared.fontSize
+        fontSizeSlider.numberOfTickMarks = 11
+        fontSizeSlider.allowsTickMarkValuesOnly = true
+        fontSizeSlider.isContinuous = true
+        fontSizeSlider.target = self
+        fontSizeSlider.action = #selector(fontSizeChanged)
+        fontSizeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        fontSizeLabel.alignment = .center
+        fontSizeLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // --- Rate mode popup ---
         rateModePopup.addItems(withTitles: ["自动获取 (推荐)", "手动输入"])
@@ -101,6 +117,7 @@ final class SettingsWindowController: NSObject {
         // --- Row stack views ---
         let apiKeyRow = makeRow(label: apiKeyLabel, control: apiKeyField)
         let dataSourceRow = makeRow(label: dataSourceLabel, control: dataSourcePopup)
+        let fontSizeRow = makeRow(label: fontSizeLabelLeft, control: fontSizeSlider, trailing: fontSizeLabel)
         let rateModeRow = makeRow(label: rateModeLabel, control: rateModePopup)
         let manualRateRow = makeRow(label: manualRateLabel, control: manualRateField)
 
@@ -121,6 +138,7 @@ final class SettingsWindowController: NSObject {
             apiKeyRow,
             separator,
             dataSourceRow,
+            fontSizeRow,
             rateModeRow,
             manualRateRow,
             buttonRow,
@@ -150,6 +168,7 @@ final class SettingsWindowController: NSObject {
             // Rows stretch full width
             apiKeyRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             dataSourceRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            fontSizeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             rateModeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             manualRateRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             buttonRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
@@ -175,6 +194,17 @@ final class SettingsWindowController: NSObject {
         return row
     }
 
+    /// Create a horizontal row: [label | control | trailingLabel] (e.g. slider + value)
+    private func makeRow(label: NSTextField, control: NSView, trailing: NSView) -> NSStackView {
+        let row = NSStackView(views: [label, control, trailing])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
+    }
+
     private func makeLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
         label.alignment = .right
@@ -190,6 +220,8 @@ final class SettingsWindowController: NSObject {
         apiKeyField.placeholderString = prefs.hasAPIKey
             ? "输入你的 AllTick API Key"
             : "⚠️ 请先粘贴你的 AllTick API Key 以开始使用"
+        fontSizeSlider.doubleValue = prefs.fontSize
+        fontSizeLabel.stringValue = String(format: "%.0f pt", prefs.fontSize)
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
@@ -223,6 +255,11 @@ final class SettingsWindowController: NSObject {
         manualRateField.isEnabled = isManual
     }
 
+    @objc private func fontSizeChanged() {
+        let size = fontSizeSlider.doubleValue
+        fontSizeLabel.stringValue = String(format: "%.0f pt", size)
+    }
+
     @objc private func saveSettings() {
         let prefs = Preferences.shared
         let newKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -237,6 +274,7 @@ final class SettingsWindowController: NSObject {
 
         prefs.apiKey = newKey
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
+        prefs.fontSize = fontSizeSlider.doubleValue
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

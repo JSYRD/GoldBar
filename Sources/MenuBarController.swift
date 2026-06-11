@@ -1,6 +1,7 @@
 import Cocoa
 
-/// Manages the macOS menu bar item — displays gold price and provides controls
+/// Manages the macOS menu bar item — displays gold price and provides controls.
+/// Supports two data source modes: HTTP polling and WebSocket push.
 final class MenuBarController: NSObject {
 
     // MARK: - Constants
@@ -9,6 +10,7 @@ final class MenuBarController: NSObject {
     // MARK: - Services
     private let goldService = GoldPriceService()
     private let currencyService = CurrencyService()
+    private let wsService = WebSocketService()
 
     // MARK: - UI
     private var statusItem: NSStatusItem!
@@ -19,17 +21,22 @@ final class MenuBarController: NSObject {
     private var lastGoldResult: GoldPriceResult?
     private var lastError: String?
     private var isUpdating = false
+    private var currentMode: String = "http" // "http" or "websocket"
+    private var wsConnectionState: WebSocketService.ConnectionState = .disconnected
 
     // MARK: - Menu items (updated dynamically)
     private let goldPriceItem = NSMenuItem(title: "金价: 加载中...", action: nil, keyEquivalent: "")
     private let exchangeRateItem = NSMenuItem(title: "汇率: 加载中...", action: nil, keyEquivalent: "")
     private let updateTimeItem = NSMenuItem(title: "更新时间: --", action: nil, keyEquivalent: "")
+    private let dataSourceItem = NSMenuItem(title: "数据源: --", action: nil, keyEquivalent: "")
 
     // MARK: - Init
     override init() {
         super.init()
         setupStatusItem()
-        startPolling()
+        setupWebSocketCallbacks()
+        observeSettingsChanges()
+        startDataFetching()
 
         // Fetch exchange rate at launch (cached for 1 hour)
         Task { await refreshExchangeRate() }
@@ -58,9 +65,13 @@ final class MenuBarController: NSObject {
         updateTimeItem.isEnabled = false
         menu.addItem(updateTimeItem)
 
+        // Data source mode
+        dataSourceItem.isEnabled = false
+        menu.addItem(dataSourceItem)
+
         menu.addItem(NSMenuItem.separator())
 
-        // Refresh Now
+        // Refresh Now (only relevant for HTTP mode)
         let refreshItem = NSMenuItem(
             title: "立即刷新", action: #selector(refreshNow), keyEquivalent: "r")
         refreshItem.target = self
@@ -86,32 +97,87 @@ final class MenuBarController: NSObject {
         statusItem.menu = menu
     }
 
-    // MARK: - Polling
-
-    private func startPolling() {
-        let interval = Preferences.shared.refreshInterval
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { await self?.refreshGoldPrice() }
+    private func setupWebSocketCallbacks() {
+        wsService.onPriceUpdate = { [weak self] result in
+            guard let self = self else { return }
+            self.lastGoldResult = result
+            self.lastError = nil
+            self.updateDisplay(with: result)
         }
-        // Fire immediately
-        Task { await refreshGoldPrice() }
+
+        wsService.onConnectionStateChange = { [weak self] state in
+            guard let self = self else { return }
+            self.wsConnectionState = state
+            self.updateDataSourceItem()
+        }
+    }
+
+    private func observeSettingsChanges() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSettingsChanged),
+            name: .goldBarSettingsChanged,
+            object: nil
+        )
+    }
+
+    @objc private func handleSettingsChanged() {
+        let newMode = Preferences.shared.dataSourceMode
+        if newMode != currentMode {
+            restartDataFetching()
+        }
+    }
+
+    // MARK: - Data fetching (mode-aware)
+
+    private func startDataFetching() {
+        currentMode = Preferences.shared.dataSourceMode
+        updateDataSourceItem()
+
+        switch currentMode {
+        case "websocket":
+            startWebSocket()
+        default:
+            startHTTPPolling()
+        }
+    }
+
+    private func stopDataFetching() {
+        stopHTTPPolling()
+        stopWebSocket()
+    }
+
+    private func restartDataFetching() {
+        stopDataFetching()
+        // Brief delay to allow cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startDataFetching()
+        }
     }
 
     func stop() {
+        NotificationCenter.default.removeObserver(self)
+        stopDataFetching()
+    }
+
+    // MARK: - HTTP Polling mode
+
+    private func startHTTPPolling() {
+        stopWebSocket()
+        let interval = Preferences.shared.refreshInterval
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { await self?.refreshGoldPriceHTTP() }
+        }
+        // Fire immediately
+        Task { await refreshGoldPriceHTTP() }
+    }
+
+    private func stopHTTPPolling() {
         timer?.invalidate()
         timer = nil
     }
 
-    // MARK: - Refresh
-
-    @objc private func refreshNow() {
-        Task {
-            await refreshGoldPrice()
-            await refreshExchangeRate(forceRefresh: true)
-        }
-    }
-
-    private func refreshGoldPrice() async {
+    private func refreshGoldPriceHTTP() async {
         guard !isUpdating else { return }
         isUpdating = true
 
@@ -132,19 +198,43 @@ final class MenuBarController: NSObject {
         isUpdating = false
     }
 
+    // MARK: - WebSocket mode
+
+    private func startWebSocket() {
+        stopHTTPPolling()
+        wsService.connect()
+    }
+
+    private func stopWebSocket() {
+        wsService.disconnect()
+    }
+
+    // MARK: - Refresh
+
+    @objc private func refreshNow() {
+        if currentMode == "websocket" {
+            // In WebSocket mode, reconnect to get fresh subscription
+            wsService.disconnect()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.wsService.connect()
+            }
+        } else {
+            Task {
+                await refreshGoldPriceHTTP()
+                await refreshExchangeRate(forceRefresh: true)
+            }
+        }
+    }
+
     private func refreshExchangeRate(forceRefresh: Bool = false) async {
-        // If in manual mode, skip auto-fetch
         if Preferences.shared.exchangeRateMode == "manual" && !forceRefresh {
             updateDisplayIfNeeded()
             return
         }
 
         do {
-            let rate = try await currencyService.fetchRate(forceRefresh: forceRefresh)
-            await MainActor.run {
-                updateDisplayIfNeeded()
-            }
-            _ = rate // used via Preferences in display update
+            _ = try await currencyService.fetchRate(forceRefresh: forceRefresh)
+            await MainActor.run { updateDisplayIfNeeded() }
         } catch {
             // Use cached or fallback rate — no need to show error for rate alone
         }
@@ -170,7 +260,13 @@ final class MenuBarController: NSObject {
     }
 
     private func updateDisplayOnError() {
-        statusItem.button?.title = "Au --.-/g"
+        if lastGoldResult == nil {
+            statusItem.button?.title = "Au --.-/g"
+        } else {
+            // Keep last known price but indicate staleness in menu
+            statusItem.button?.title = (statusItem.button?.title ?? "Au ⌛")
+                .replacingOccurrences(of: "Au ¥", with: "Au ⚠¥")
+        }
         goldPriceItem.title = "金价: 获取失败"
         if let error = lastError {
             exchangeRateItem.title = "错误: \(error)"
@@ -179,9 +275,27 @@ final class MenuBarController: NSObject {
     }
 
     private func updateDisplayIfNeeded() {
-        // Recompute display when exchange rate changes
         if let result = lastGoldResult {
             updateDisplay(with: result)
+        }
+    }
+
+    private func updateDataSourceItem() {
+        let modeLabel = currentMode == "websocket" ? "WebSocket" : "HTTP 轮询"
+
+        switch wsConnectionState {
+        case .connected:
+            dataSourceItem.title = "数据源: \(modeLabel) ✅"
+        case .connecting:
+            dataSourceItem.title = "数据源: \(modeLabel) ⏳"
+        case .disconnected:
+            if currentMode == "websocket" {
+                dataSourceItem.title = "数据源: \(modeLabel) ❌ (自动重连中)"
+            } else {
+                dataSourceItem.title = "数据源: \(modeLabel)"
+            }
+        case .error(let msg):
+            dataSourceItem.title = "数据源: \(modeLabel) ❌ \(msg)"
         }
     }
 

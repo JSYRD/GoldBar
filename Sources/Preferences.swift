@@ -15,6 +15,7 @@ final class Preferences {
         static let lastExchangeRate = "lastExchangeRate"
         static let lastExchangeRateUpdate = "lastExchangeRateUpdate"
         static let refreshIntervalSeconds = "refreshIntervalSeconds"
+        static let dataSourceMode = "dataSourceMode" // "http" or "websocket"
     }
 
     // MARK: - Default values
@@ -71,6 +72,12 @@ final class Preferences {
         set {
             defaults.set(max(10, newValue), forKey: Key.refreshIntervalSeconds)
         }
+    }
+
+    /// Data source mode: "http" for REST polling, "websocket" for real-time push
+    var dataSourceMode: String {
+        get { defaults.string(forKey: Key.dataSourceMode) ?? "http" }
+        set { defaults.set(newValue, forKey: Key.dataSourceMode) }
     }
 
     /// Returns the effective exchange rate: manual if in manual mode,

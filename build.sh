@@ -42,6 +42,7 @@ SWIFT_FILES=(
     "$SOURCE_DIR/CurrencyService.swift"
     "$SOURCE_DIR/MenuBarController.swift"
     "$SOURCE_DIR/SettingsWindowController.swift"
+    "$SOURCE_DIR/WebSocketService.swift"
 )
 
 echo "  Compiling ${#SWIFT_FILES[@]} Swift files..."

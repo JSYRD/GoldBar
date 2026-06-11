@@ -1,12 +1,18 @@
 import Cocoa
 
-/// Settings window — allows the user to configure API key and exchange rate
+/// Notification posted when settings that affect data fetching change
+extension Notification.Name {
+    static let goldBarSettingsChanged = Notification.Name("GoldBarSettingsChanged")
+}
+
+/// Settings window — allows the user to configure API key, data source, and exchange rate
 final class SettingsWindowController: NSObject {
 
     private var window: NSWindow?
 
     // MARK: - Controls
     private let apiKeyField = NSTextField(frame: .zero)
+    private let dataSourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let rateModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let manualRateField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
@@ -23,7 +29,7 @@ final class SettingsWindowController: NSObject {
 
     private func buildWindow() {
         let width: CGFloat = 480
-        let height: CGFloat = 260
+        let height: CGFloat = 310
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -32,7 +38,7 @@ final class SettingsWindowController: NSObject {
             defer: false
         )
         win.title = "GoldBar 设置"
-        win.minSize = NSSize(width: 420, height: 220)
+        win.minSize = NSSize(width: 420, height: 270)
         win.center()
         win.isReleasedWhenClosed = false
 
@@ -40,6 +46,7 @@ final class SettingsWindowController: NSObject {
 
         // --- Labels ---
         let apiKeyLabel = makeLabel("API Key:")
+        let dataSourceLabel = makeLabel("数据源:")
         let rateModeLabel = makeLabel("汇率模式:")
         let manualRateLabel = makeLabel("手动汇率:")
 
@@ -48,6 +55,13 @@ final class SettingsWindowController: NSObject {
         apiKeyField.isBordered = true
         apiKeyField.bezelStyle = .squareBezel
         apiKeyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        // --- Data source popup ---
+        dataSourcePopup.addItems(withTitles: [
+            "HTTP 轮询 (省资源，每15秒)",
+            "WebSocket 实时推送 (秒级更新)"
+        ])
+        dataSourcePopup.toolTip = "HTTP: 定时拉取数据，节省资源。WebSocket: 长连接实时推送，更新更快"
 
         // --- Rate mode popup ---
         rateModePopup.addItems(withTitles: ["自动获取 (推荐)", "手动输入"])
@@ -79,9 +93,12 @@ final class SettingsWindowController: NSObject {
         statusLabel.drawsBackground = false
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        statusLabel.lineBreakMode = .byWordWrapping
+        statusLabel.maximumNumberOfLines = 3
 
         // --- Row stack views ---
         let apiKeyRow = makeRow(label: apiKeyLabel, control: apiKeyField)
+        let dataSourceRow = makeRow(label: dataSourceLabel, control: dataSourcePopup)
         let rateModeRow = makeRow(label: rateModeLabel, control: rateModePopup)
         let manualRateRow = makeRow(label: manualRateLabel, control: manualRateField)
 
@@ -90,12 +107,18 @@ final class SettingsWindowController: NSObject {
         buttonRow.alignment = .centerY
         buttonRow.distribution = .fill
         buttonRow.spacing = 12
-        // Push buttons to the right
         buttonRow.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+
+        // --- Separator before data source ---
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
 
         // --- Main stack ---
         let mainStack = NSStackView(views: [
             apiKeyRow,
+            separator,
+            dataSourceRow,
             rateModeRow,
             manualRateRow,
             buttonRow,
@@ -106,6 +129,8 @@ final class SettingsWindowController: NSObject {
         mainStack.distribution = .fill
         mainStack.spacing = 14
         mainStack.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.setCustomSpacing(10, after: apiKeyRow)    // gap before separator
+        mainStack.setCustomSpacing(10, after: separator)     // gap after separator
         mainStack.setCustomSpacing(20, after: manualRateRow)
 
         contentView.addSubview(mainStack)
@@ -116,14 +141,20 @@ final class SettingsWindowController: NSObject {
             mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             mainStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
 
+            // Separator stretches full width
+            separator.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+
             // Rows stretch full width
             apiKeyRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            dataSourceRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             rateModeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             manualRateRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             buttonRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
 
             // Fixed label widths for alignment
             apiKeyLabel.widthAnchor.constraint(equalToConstant: 80),
+            dataSourceLabel.widthAnchor.constraint(equalToConstant: 80),
             rateModeLabel.widthAnchor.constraint(equalToConstant: 80),
             manualRateLabel.widthAnchor.constraint(equalToConstant: 80),
         ])
@@ -154,22 +185,30 @@ final class SettingsWindowController: NSObject {
     private func refreshFields() {
         let prefs = Preferences.shared
         apiKeyField.stringValue = prefs.apiKey
+        dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
         manualRateField.isEnabled = prefs.exchangeRateMode == "manual"
 
-        // Show cache status
+        // Show cache / connection status
+        var lines: [String] = []
+
         if prefs.exchangeRateMode == "auto",
            let lastRate = prefs.lastExchangeRate,
            let lastUpdate = prefs.lastExchangeRateUpdate {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "zh_CN")
             formatter.dateFormat = "MM-dd HH:mm"
-            statusLabel.stringValue =
-                "当前汇率: \(String(format: "%.4f", lastRate)) (更新于 \(formatter.string(from: lastUpdate)))"
-        } else {
-            statusLabel.stringValue = ""
+            lines.append("当前汇率: \(String(format: "%.4f", lastRate)) (更新于 \(formatter.string(from: lastUpdate)))")
         }
+
+        if prefs.dataSourceMode == "websocket" {
+            lines.append("💡 WebSocket 模式: 建立连接后秒级更新，无需手动刷新")
+        } else {
+            lines.append("💡 HTTP 模式: 每15秒自动拉取，节省系统资源")
+        }
+
+        statusLabel.stringValue = lines.joined(separator: "\n")
     }
 
     // MARK: - Actions
@@ -188,17 +227,27 @@ final class SettingsWindowController: NSObject {
             return
         }
 
+        let oldDataSourceMode = prefs.dataSourceMode
+        let oldAPIKey = prefs.apiKey
+
         prefs.apiKey = newKey
+        prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {
             prefs.manualExchangeRate = manualRate
         }
 
-        statusLabel.stringValue = "✅ 设置已保存"
+        // Notify if data source mode or API key changed (so MenuBarController can switch)
+        if prefs.dataSourceMode != oldDataSourceMode || prefs.apiKey != oldAPIKey {
+            NotificationCenter.default.post(
+                name: .goldBarSettingsChanged, object: nil)
+        }
+
+        statusLabel.stringValue = "✅ 设置已保存 — 若切换数据源将立即生效"
         statusLabel.textColor = .systemGreen
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.statusLabel.textColor = .secondaryLabelColor
             self?.refreshFields()
         }

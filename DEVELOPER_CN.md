@@ -1,4 +1,4 @@
-[English](./DEVELOPER.md) | 中文 | [用户文档](./README_CN.md)
+[EN](./README.md) | [中文](./README_CN.md) | [Dev](./DEVELOPER.md) | 开发者
 
 # GoldBar 开发者文档
 

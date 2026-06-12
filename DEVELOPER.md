@@ -182,6 +182,30 @@ The DMG pipeline (`package.sh`):
 5. Unmount → convert to UDZO (compressed, read-only)
 6. Print SHA256 for Homebrew formula
 
+## Release Workflow
+
+How to cut a new release:
+
+```bash
+# 1. Bump version in Resources/Info.plist (CFBundleShortVersionString)
+# 2. Build + package
+make package
+# 3. Note the SHA256 printed at the end
+# 4. Commit, tag, push
+git add -A && git commit -m "bump to vX.Y.Z"
+git tag vX.Y.Z
+git push origin master --tags
+# 5. Create GitHub Release + upload DMG
+gh release create vX.Y.Z build/GoldBar-X.Y.Z.dmg \
+  --title "GoldBar vX.Y.Z" --notes "Release notes..."
+# 6. Update Homebrew formula
+#    Edit jsyrd/homebrew-goldbar/Formula/goldbar.rb:
+#      url "https://github.com/JSYRD/GoldBar/releases/download/vX.Y.Z/GoldBar-X.Y.Z.dmg"
+#      sha256 "..."  (from step 3)
+#      version "X.Y.Z"
+#    Commit + push to homebrew-goldbar repo
+```
+
 ### Build Script Steps
 1. `swiftc` compiles all `.swift` files → single `GoldBar` binary (arm64)
 2. Creates `.app` bundle structure with Info.plist + PkgInfo

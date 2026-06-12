@@ -35,13 +35,21 @@ make package       # Release build + DMG
 
 ## Installation
 
-### Download (recommended)
+### Homebrew (recommended)
+
+```bash
+brew tap JSYRD/goldbar
+brew install goldbar
+```
+
+### Download DMG
 
 Download the latest `GoldBar-*.dmg` from [GitHub Releases](https://github.com/JSYRD/GoldBar/releases), open it, and drag GoldBar into Applications.
 
 ### Build from source
 
 ```bash
+git clone https://github.com/JSYRD/GoldBar.git
 cd GoldBar
 ./build.sh release
 open build/GoldBar.app

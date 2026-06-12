@@ -35,13 +35,21 @@ make package       # Release 构建 + DMG 打包
 
 ## 安装
 
-### 下载安装（推荐）
+### Homebrew（推荐）
+
+```bash
+brew tap JSYRD/goldbar
+brew install goldbar
+```
+
+### 下载 DMG
 
 从 [GitHub Releases](https://github.com/JSYRD/GoldBar/releases) 下载最新 `GoldBar-*.dmg`，打开后将 GoldBar 拖入「应用程序」即可。
 
 ### 从源码构建
 
 ```bash
+git clone https://github.com/JSYRD/GoldBar.git
 cd GoldBar
 ./build.sh release
 open build/GoldBar.app

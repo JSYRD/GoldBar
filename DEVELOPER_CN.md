@@ -175,6 +175,30 @@ make package        # Release 构建 + DMG 打包
 5. 卸载 → 转换为 UDZO（压缩只读）
 6. 输出 SHA256 供 Homebrew formula 使用
 
+## 发布流程
+
+发新版步骤：
+
+```bash
+# 1. 修改版本号 Resources/Info.plist (CFBundleShortVersionString)
+# 2. 构建 + 打包
+make package
+# 3. 记下末尾输出的 SHA256
+# 4. 提交、打 tag、推送
+git add -A && git commit -m "bump to vX.Y.Z"
+git tag vX.Y.Z
+git push origin master --tags
+# 5. 创建 GitHub Release + 上传 DMG
+gh release create vX.Y.Z build/GoldBar-X.Y.Z.dmg \
+  --title "GoldBar vX.Y.Z" --notes "Release notes..."
+# 6. 更新 Homebrew formula
+#    编辑 jsyrd/homebrew-goldbar 仓库的 Formula/goldbar.rb：
+#      url "https://github.com/JSYRD/GoldBar/releases/download/vX.Y.Z/GoldBar-X.Y.Z.dmg"
+#      sha256 "..."  (来自步骤 3)
+#      version "X.Y.Z"
+#    提交并推送到 homebrew-goldbar 仓库
+```
+
 ## API 参考
 
 ### AllTick `/trade-tick` (REST)

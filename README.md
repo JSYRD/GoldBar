@@ -11,6 +11,7 @@ Display the current gold price in RMB per gram on your macOS menu bar, with dail
 - 🔄 **Dual Data Source** — HTTP polling (efficient) or WebSocket push (real-time)
 - 🌐 **Auto Currency Conversion** — Fetches USD/CNY rate, converts USD/oz to RMB/g
 - 🔤 **Adjustable Display** — Font size and baseline offset sliders
+- 🌐 **HTTP Status API** — Optional local HTTP server serving real-time gold data as JSON
 - ⚙️ **No Hardcoded Key** — First-launch window prompts user for their own API key
 - 💾 **Low Resource Usage** — Silent background operation
 - 🔒 **Menu Bar Only** — No Dock icon
@@ -75,6 +76,40 @@ Au ¥895.2/g ↑0.50%    ← colored: green(up) / red(down), or swap via setting
 | Baseline Offset | Vertical alignment tweak (-4.0–+4.0 pt) |
 | Rate Mode | Auto-fetch (hourly) or manual fixed rate |
 | Manual Rate | Only used in manual mode |
+| HTTP API | Serve JSON status endpoint on localhost (default port 9188) |
+
+### HTTP Status API
+
+When enabled in settings, query via browser or `curl`:
+
+```bash
+curl http://127.0.0.1:9188/         # Full status
+curl http://127.0.0.1:9188/price    # Price only
+curl http://127.0.0.1:9188/health   # Health check
+```
+
+Example response:
+
+```json
+{
+  "gold": {
+    "price_usd_oz": 4193.35,
+    "price_rmb_g": 915.1,
+    "change_percent": -0.45,
+    "change_direction": "down",
+    "previous_close": 4212.21
+  },
+  "exchange_rate": {
+    "usd_cny": 6.7876,
+    "mode": "auto"
+  },
+  "connection": {
+    "mode": "websocket",
+    "state": "connected",
+    "last_update": "2026-06-12T02:07:00Z"
+  }
+}
+```
 
 ## Data Sources
 

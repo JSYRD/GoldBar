@@ -18,7 +18,9 @@ GoldBar/
 │   ├── SettingsWindowController.swift     # 纯代码设置窗口 (NSStackView 布局)
 │   ├── SetupWindowController.swift       # 首次启动 API Key 配置
 │   ├── SingleLineFormatter.swift         # 过滤换行符的 Formatter
-│   └── DebugLog.swift                    # Debug 构建终端日志 (#if DEBUG)
+│   ├── DebugLog.swift                    # Debug 构建终端日志 (#if DEBUG)
+│   ├── StatusSnapshot.swift              # 线程安全状态快照 (HTTP 接口用)
+│   └── HTTPServer.swift                  # 本地 HTTP 服务器 (localhost JSON API)
 ├── Tests/
 │   ├── main.swift                        # 测试入口
 │   ├── TestHelpers.swift                 # 断言 + 测试运行器
@@ -198,6 +200,8 @@ GET https://open.er-api.com/v6/latest/USD → { rates: { CNY: 6.789317 } }
 | `baselineOffset` | Double | -0.5 | 垂直偏移 (-4.0–+4.0) |
 | `exchangeRateMode` | String | `"auto"` | `"auto"` 或 `"manual"` |
 | `previousClose` | Double? | `nil` | 昨日金价收盘 (USD/oz) |
+| `httpServerEnabled` | Bool | `false` | 启用本地 HTTP 状态接口 |
+| `httpServerPort` | Int | `9188` | HTTP 服务器端口 (1–65535) |
 
 ## 测试
 

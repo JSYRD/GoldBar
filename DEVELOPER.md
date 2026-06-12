@@ -18,7 +18,9 @@ GoldBar/
 │   ├── SettingsWindowController.swift     # Code-only settings window (NSStackView)
 │   ├── SetupWindowController.swift       # First-launch API key configuration
 │   ├── SingleLineFormatter.swift         # Formatter that strips newlines
-│   └── DebugLog.swift                    # Debug-build terminal logging (#if DEBUG)
+│   ├── DebugLog.swift                    # Debug-build terminal logging (#if DEBUG)
+│   ├── StatusSnapshot.swift              # Thread-safe status snapshot for HTTP API
+│   └── HTTPServer.swift                  # Local HTTP server (localhost JSON API)
 ├── Tests/
 │   ├── main.swift                        # Test entry point
 │   ├── TestHelpers.swift                 # Assertions + test runner
@@ -212,6 +214,8 @@ Cached for 1 hour.
 | `baselineOffset` | Double | -0.5 | Vertical alignment offset (-4.0–+4.0) |
 | `exchangeRateMode` | String | `"auto"` | `"auto"` or `"manual"` |
 | `previousClose` | Double? | `nil` | Yesterday's gold close (USD/oz) |
+| `httpServerEnabled` | Bool | `false` | Enable local HTTP status API |
+| `httpServerPort` | Int | `9188` | Port for HTTP server (1–65535) |
 
 ## Testing
 

@@ -47,6 +47,8 @@ SWIFT_FILES=(
     "$SOURCE_DIR/SingleLineFormatter.swift"
     "$SOURCE_DIR/KLineService.swift"
     "$SOURCE_DIR/DebugLog.swift"
+    "$SOURCE_DIR/StatusSnapshot.swift"
+    "$SOURCE_DIR/HTTPServer.swift"
 )
 
 echo "  Compiling ${#SWIFT_FILES[@]} Swift files..."

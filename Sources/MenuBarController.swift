@@ -18,6 +18,7 @@ final class MenuBarController: NSObject {
     private let currencyService = CurrencyService()
     private let klineService = KLineService()
     private let wsService = WebSocketService()
+    private let httpServer = MiniHTTPServer()
 
     // MARK: - UI
     private var statusItem: NSStatusItem!
@@ -184,6 +185,7 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func handleSettingsChanged() {
+        syncHTTPServer()
         let newMode = Preferences.shared.dataSourceMode
         if newMode != currentMode {
             restartDataFetching()
@@ -197,6 +199,7 @@ final class MenuBarController: NSObject {
         updateDataSourceItem()
 
         DebugLog.info("mode switch", ["mode": currentMode])
+        syncHTTPServer()
         switch currentMode {
         case "websocket":
             startWebSocket()
@@ -221,8 +224,29 @@ final class MenuBarController: NSObject {
     func stop() {
         NotificationCenter.default.removeObserver(self)
         stopDataFetching()
+        httpServer.stop()
         klineTimer?.invalidate()
         klineTimer = nil
+    }
+
+    // MARK: - HTTP Status Server
+
+    private func syncHTTPServer() {
+        let prefs = Preferences.shared
+        if prefs.httpServerEnabled {
+            httpServer.start(port: UInt16(prefs.httpServerPort))
+        } else {
+            httpServer.stop()
+        }
+    }
+
+    private func connectionLabel() -> String {
+        switch wsConnectionState {
+        case .connected: return "connected"
+        case .connecting: return "connecting"
+        case .disconnected: return currentMode == "websocket" ? "disconnected" : "polling"
+        case .error(let msg): return "error: \(msg)"
+        }
     }
 
     // MARK: - HTTP Polling mode
@@ -391,9 +415,18 @@ final class MenuBarController: NSObject {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "HH:mm:ss"
         updateTimeItem.title = "更新时间: \(formatter.string(from: result.tickTime))"
+
+        // Push to HTTP status server
+        StatusSnapshot.shared.update(
+            priceUSD: result.priceUSDPerOunce, priceRMB: rmbPerGram,
+            changePercent: changePercent, previousClose: previousClose,
+            exchangeRate: rate, exchangeRateMode: Preferences.shared.exchangeRateMode,
+            dataSourceMode: currentMode, connectionState: connectionLabel()
+        )
     }
 
     private func updateDisplayOnError() {
+        StatusSnapshot.shared.updateError(lastError ?? "unknown")
         DebugLog.error("fetch failed", ["error": lastError ?? "unknown"])
         if lastGoldResult == nil {
             statusItem.button?.attributedTitle = NSAttributedString(

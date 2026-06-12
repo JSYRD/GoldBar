@@ -19,11 +19,15 @@ final class SettingsWindowController: NSObject {
     private let baselineLabel = NSTextField(labelWithString: "-0.5 pt")
     private let rateModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let manualRateField = NSTextField(frame: .zero)
+    private let httpServerCheckbox = NSButton(checkboxWithTitle: "启用", target: nil, action: nil)
+    private let httpPortField = NSTextField(frame: .zero)
     private let statusLabel = NSTextField(frame: .zero)
 
     /// Captured values — stored as integer "steps", converted on save
     private var pendingFontSize: Int = Int(Preferences.defaultFontSize)
     private var pendingBaselineStep: Int = Int(Preferences.defaultBaselineOffset * 2.0)
+    private var pendingHTTPServerEnabled = false
+    private var pendingHTTPPort = 9188
 
     func showWindow() {
         if window == nil {
@@ -37,7 +41,7 @@ final class SettingsWindowController: NSObject {
 
     private func buildWindow() {
         let width: CGFloat = 480
-        let height: CGFloat = 390
+        let height: CGFloat = 430
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -99,6 +103,32 @@ final class SettingsWindowController: NSObject {
         baselineLabel.alignment = .center
         baselineLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        // --- HTTP Server ---
+        let httpServerLabelLeft = makeLabel("HTTP 接口:")
+        httpServerCheckbox.target = self
+        httpServerCheckbox.action = #selector(httpServerToggled)
+        httpPortField.placeholderString = "9188"
+        httpPortField.isBordered = true
+        httpPortField.bezelStyle = .squareBezel
+        httpPortField.formatter = {
+            let f = NumberFormatter()
+            f.allowsFloats = false
+            f.minimum = 1
+            f.maximum = 65535
+            return f
+        }()
+        httpPortField.isEnabled = false
+        httpPortField.translatesAutoresizingMaskIntoConstraints = false
+        let httpServerRow = NSStackView(views: [
+            httpServerLabelLeft, httpServerCheckbox, httpPortField
+        ])
+        httpServerRow.orientation = .horizontal
+        httpServerRow.alignment = .centerY
+        httpServerRow.distribution = .fill
+        httpServerRow.spacing = 12
+        httpServerRow.translatesAutoresizingMaskIntoConstraints = false
+        httpPortField.widthAnchor.constraint(equalToConstant: 70).isActive = true
+
         // --- Rate mode popup ---
         rateModePopup.addItems(withTitles: ["自动获取 (推荐)", "手动输入"])
         rateModePopup.target = self
@@ -159,6 +189,7 @@ final class SettingsWindowController: NSObject {
             dataSourceRow,
             fontSizeRow,
             baselineRow,
+            httpServerRow,
             rateModeRow,
             manualRateRow,
             buttonRow,
@@ -190,6 +221,7 @@ final class SettingsWindowController: NSObject {
             dataSourceRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             fontSizeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             baselineRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            httpServerRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             rateModeRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             manualRateRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             buttonRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
@@ -199,6 +231,7 @@ final class SettingsWindowController: NSObject {
             dataSourceLabel.widthAnchor.constraint(equalToConstant: 80),
             rateModeLabel.widthAnchor.constraint(equalToConstant: 80),
             manualRateLabel.widthAnchor.constraint(equalToConstant: 80),
+            httpServerLabelLeft.widthAnchor.constraint(equalToConstant: 80),
         ])
 
         window = win
@@ -247,6 +280,11 @@ final class SettingsWindowController: NSObject {
         fontSizeLabel.stringValue = "\(pendingFontSize) pt"
         baselineSlider.integerValue = pendingBaselineStep
         baselineLabel.stringValue = String(format: "%+.1f pt", Double(pendingBaselineStep) * 0.5)
+        pendingHTTPServerEnabled = prefs.httpServerEnabled
+        httpServerCheckbox.state = pendingHTTPServerEnabled ? .on : .off
+        pendingHTTPPort = prefs.httpServerPort
+        httpPortField.integerValue = pendingHTTPPort
+        httpPortField.isEnabled = pendingHTTPServerEnabled
         dataSourcePopup.selectItem(at: prefs.dataSourceMode == "websocket" ? 1 : 0)
         rateModePopup.selectItem(at: prefs.exchangeRateMode == "manual" ? 1 : 0)
         manualRateField.stringValue = String(format: "%.4f", prefs.manualExchangeRate)
@@ -291,6 +329,11 @@ final class SettingsWindowController: NSObject {
         baselineLabel.stringValue = String(format: "%+.1f pt", actual)
     }
 
+    @objc private func httpServerToggled() {
+        pendingHTTPServerEnabled = httpServerCheckbox.state == .on
+        httpPortField.isEnabled = pendingHTTPServerEnabled
+    }
+
     @objc private func saveSettings() {
         let prefs = Preferences.shared
         let newKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -307,6 +350,8 @@ final class SettingsWindowController: NSObject {
         prefs.dataSourceMode = dataSourcePopup.indexOfSelectedItem == 1 ? "websocket" : "http"
         prefs.fontSize = Double(pendingFontSize)
         prefs.baselineOffset = Double(pendingBaselineStep) * 0.5
+        prefs.httpServerEnabled = pendingHTTPServerEnabled
+        prefs.httpServerPort = httpPortField.integerValue
         prefs.exchangeRateMode = rateModePopup.indexOfSelectedItem == 1 ? "manual" : "auto"
 
         if let manualRate = Double(manualRateField.stringValue), manualRate > 0 {

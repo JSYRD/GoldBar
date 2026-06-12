@@ -21,6 +21,8 @@ final class Preferences {
         static let colorScheme = "colorScheme" // "western" (green↑/red↓) or "chinese" (red↑/green↓)
         static let fontSize = "fontSize"
         static let baselineOffset = "baselineOffset"
+        static let httpServerEnabled = "httpServerEnabled"
+        static let httpServerPort = "httpServerPort"
     }
 
     // MARK: - Default values
@@ -138,6 +140,21 @@ final class Preferences {
     var dataSourceMode: String {
         get { defaults.string(forKey: Key.dataSourceMode) ?? "http" }
         set { defaults.set(newValue, forKey: Key.dataSourceMode) }
+    }
+
+    /// Whether the local HTTP status server is enabled
+    var httpServerEnabled: Bool {
+        get { defaults.bool(forKey: Key.httpServerEnabled) }
+        set { defaults.set(newValue, forKey: Key.httpServerEnabled) }
+    }
+
+    /// Port for the local HTTP status server (1–65535, default 9188)
+    var httpServerPort: Int {
+        get {
+            let val = defaults.integer(forKey: Key.httpServerPort)
+            return (1...65535).contains(val) ? val : 9188
+        }
+        set { defaults.set(min(max(newValue, 1), 65535), forKey: Key.httpServerPort) }
     }
 
     /// Returns the effective exchange rate: manual if in manual mode,

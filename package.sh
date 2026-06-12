@@ -72,17 +72,10 @@ MOUNT_DIR="/Volumes/GoldBar"
 
 cp -R "$DIST_DIR"/GoldBar.app "$MOUNT_DIR/"
 
-# 4c. Set DMG volume icon (same as app icon)
-if [ -f "$RESOURCES_DIR/app-icon.icns" ]; then
-    cp "$RESOURCES_DIR/app-icon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
-    SetFile -a C "$MOUNT_DIR" 2>/dev/null || true
-fi
-
 # 4d. Determine Applications symlink name for locale
 APP_LINK_NAME="Applications"
 case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
     zh) APP_LINK_NAME="应用程序" ;;
-    ja) APP_LINK_NAME="Applications" ;;   # Japanese uses same
     ko) APP_LINK_NAME="응용 프로그램" ;;
     *)  APP_LINK_NAME="Applications" ;;
 esac
@@ -97,6 +90,7 @@ if [ "$HAS_BG" = true ]; then
     cp "$RESOURCES_DIR/dmg-background.png" "$MOUNT_DIR/.background/background.png"
     SetFile -a V "$MOUNT_DIR/.background" 2>/dev/null || true
 
+    # Background is 1080×760; drop zones centred at (265,350) and (825,350)
     osascript -e "
         tell application \"Finder\"
             set vol to disk \"GoldBar\"
@@ -105,18 +99,27 @@ if [ "$HAS_BG" = true ]; then
             set toolbar visible of w to false
             set statusbar visible of w to false
             set current view of w to icon view
-            set bounds of w to {200, 200, 740, 480}
+            set bounds of w to {50, 50, 1130, 810}
             set opts to icon view options of w
             set arrangement of opts to not arranged
-            set icon size of opts to 72
+            set icon size of opts to 128
             set background picture of opts to file \".background:background.png\" of vol
-            set position of item \"GoldBar.app\" of w to {120, 120}
-            set position of item \"${APP_LINK_NAME}\" of w to {340, 120}
+            set position of item \"GoldBar.app\" of w to {265, 350}
+            set position of item \"${APP_LINK_NAME}\" of w to {825, 350}
             update vol without registering applications
             delay 0.5
             close w
         end tell
     " 2>/dev/null || true
+fi
+
+# 4f. Volume icon: set custom icon via xattr (more reliable than SetFile)
+if [ -f "$RESOURCES_DIR/app-icon.icns" ]; then
+    cp "$RESOURCES_DIR/app-icon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
+    # Write FinderInfo xattr with bit 9 (kHasCustomIcon) set = 0x0400
+    xattr -wx com.apple.FinderInfo \
+        "0000000000000000000400000000000000000000000000000000000000000000" \
+        "$MOUNT_DIR" 2>/dev/null || true
 fi
 
 # Unmount before converting

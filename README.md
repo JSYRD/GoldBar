@@ -21,6 +21,14 @@ Display the current gold price in RMB per gram on your macOS menu bar, with dail
 - Apple Silicon or Intel Mac
 - Internet connection
 
+## Development
+
+```bash
+./test.sh          # Run test suite
+./build.sh         # Debug build (with terminal logging)
+./build.sh release # Release build (optimized, no logs)
+```
+
 ## Installation
 
 ```bash

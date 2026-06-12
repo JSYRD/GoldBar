@@ -17,10 +17,19 @@ GoldBar/
 │   ├── MenuBarController.swift           # NSStatusItem + 菜单 + 双模式调度
 │   ├── SettingsWindowController.swift     # 纯代码设置窗口 (NSStackView 布局)
 │   ├── SetupWindowController.swift       # 首次启动 API Key 配置
-│   └── SingleLineFormatter.swift         # 过滤换行符的 Formatter
+│   ├── SingleLineFormatter.swift         # 过滤换行符的 Formatter
+│   └── DebugLog.swift                    # Debug 构建终端日志 (#if DEBUG)
+├── Tests/
+│   ├── main.swift                        # 测试入口
+│   ├── TestHelpers.swift                 # 断言 + 测试运行器
+│   ├── PreferencesTests.swift            # UserDefaults 读写测试
+│   ├── PriceCalcTests.swift              # 价格换算 + 涨跌计算测试
+│   ├── ColorSchemeTests.swift            # 配色逻辑测试
+│   └── APITests.swift                    # 真实 API 集成测试
 ├── Resources/
 │   └── Info.plist                        # LSUIElement=true, bundle 元数据
 ├── build.sh                              # swiftc → .app 打包 → ad-hoc 签名
+├── test.sh                               # 构建 + 运行测试套件
 ├── README.md / README_CN.md             # 用户文档
 └── DEVELOPER.md / DEVELOPER_CN.md        # 开发者文档
 ```
@@ -189,6 +198,44 @@ GET https://open.er-api.com/v6/latest/USD → { rates: { CNY: 6.789317 } }
 | `baselineOffset` | Double | -0.5 | 垂直偏移 (-4.0–+4.0) |
 | `exchangeRateMode` | String | `"auto"` | `"auto"` 或 `"manual"` |
 | `previousClose` | Double? | `nil` | 昨日金价收盘 (USD/oz) |
+
+## 测试
+
+### 运行测试
+
+```bash
+./test.sh          # 单元测试（无网络，秒过）
+./test.sh --all    # 单元 + 集成测试（需要 API key + 网络）
+```
+
+### 测试覆盖
+
+| 套件 | 文件 | 内容 |
+|------|------|------|
+| Preferences | `PreferencesTests.swift` | apiKey 存取、fontSize/baseline clamp、dataSource/colorScheme 读写 |
+| 价格计算 | `PriceCalcTests.swift` | RMB/g 换算公式、涨跌%计算、四舍五入、汇率选择 |
+| 配色逻辑 | `ColorSchemeTests.swift` | 东西方配色映射、箭头方向、显示格式化 |
+| API 集成 | `APITests.swift` | 金价 trade-tick、K线基准价、汇率 API（需 `--all`） |
+
+API Key 可通过环境变量传入：`GOLDBAR_API_KEY=xxx ./test.sh --all`
+
+## Debug 日志
+
+Debug 构建（`./build.sh`）会输出时间戳日志到终端：
+
+```
+[09:33:16.714] [GoldBar] mode switch | mode=websocket
+[09:33:21.089] [GoldBar] tick | USD/oz=4179.10 RMB/g=911.99 chg=↓0.79% mode=websocket
+```
+
+直接从终端启动二进制才能看到日志：
+
+```bash
+./build.sh
+/opt/subwoy/GoldBar/build/GoldBar.app/Contents/MacOS/GoldBar &
+```
+
+Release 构建（`./build.sh release`）无 `-D DEBUG` 标志，所有日志调用编译时剔除，零开销。
 
 ## 扩展指南
 

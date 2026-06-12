@@ -17,10 +17,19 @@ GoldBar/
 │   ├── MenuBarController.swift           # NSStatusItem + menu + dual-mode orchestration
 │   ├── SettingsWindowController.swift     # Code-only settings window (NSStackView)
 │   ├── SetupWindowController.swift       # First-launch API key configuration
-│   └── SingleLineFormatter.swift         # Formatter that strips newlines
+│   ├── SingleLineFormatter.swift         # Formatter that strips newlines
+│   └── DebugLog.swift                    # Debug-build terminal logging (#if DEBUG)
+├── Tests/
+│   ├── main.swift                        # Test entry point
+│   ├── TestHelpers.swift                 # Assertions + test runner
+│   ├── PreferencesTests.swift            # UserDefaults read/write tests
+│   ├── PriceCalcTests.swift              # Price conversion + change calc tests
+│   ├── ColorSchemeTests.swift            # Color scheme logic tests
+│   └── APITests.swift                    # Real API integration tests
 ├── Resources/
 │   └── Info.plist                        # LSUIElement=true, bundle metadata
 ├── build.sh                              # swiftc → .app bundle → ad-hoc sign
+├── test.sh                               # Build + run test suite
 ├── README.md / README_CN.md             # User documentation
 └── DEVELOPER.md / DEVELOPER_CN.md        # Developer documentation
 ```
@@ -203,6 +212,43 @@ Cached for 1 hour.
 | `baselineOffset` | Double | -0.5 | Vertical alignment offset (-4.0–+4.0) |
 | `exchangeRateMode` | String | `"auto"` | `"auto"` or `"manual"` |
 | `previousClose` | Double? | `nil` | Yesterday's gold close (USD/oz) |
+
+## Testing
+
+### Running tests
+
+```bash
+./test.sh          # unit tests only (no network, instant)
+./test.sh --all    # unit + integration tests (needs API key + network)
+```
+
+### Test coverage
+
+| Suite | File | Covers |
+|-------|------|--------|
+| Preferences | `PreferencesTests.swift` | apiKey get/set, fontSize/baseline clamping, dataSource/colorScheme |
+| Price calc | `PriceCalcTests.swift` | RMB/g conversion, change %, rounding, exchange rate selection |
+| Color scheme | `ColorSchemeTests.swift` | Western/Chinese color mapping, arrow direction, display format |
+| API integration | `APITests.swift` | Gold trade-tick, K-line reference, exchange rate (needs `--all`) |
+
+Pass API key via env: `GOLDBAR_API_KEY=xxx ./test.sh --all`
+
+## Debug Logging
+
+Debug builds (`./build.sh`) emit timestamped logs to stdout:
+
+```
+[09:33:21.089] [GoldBar] tick | USD/oz=4179.10 RMB/g=911.99 chg=↓0.79% mode=websocket
+```
+
+Run the binary directly to see logs:
+
+```bash
+./build.sh
+/path/to/GoldBar.app/Contents/MacOS/GoldBar &
+```
+
+Release builds (`./build.sh release`) omit `-D DEBUG` — all log calls compile away to nothing.
 
 ## Extension Points
 

@@ -21,6 +21,14 @@
 - Apple Silicon (M1/M2/M3/M4) 或 Intel Mac
 - 互联网连接
 
+## 开发者
+
+```bash
+./test.sh          # 运行测试套件
+./build.sh         # Debug 构建（带终端实时日志）
+./build.sh release # Release 构建（优化，无日志）
+```
+
 ## 安装
 
 ```bash

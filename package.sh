@@ -81,8 +81,13 @@ case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
 esac
 
 rm -rf "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
-# Standard: symlink to /Applications (works everywhere, shows proper folder icon)
-ln -s /Applications "$MOUNT_DIR/$APP_LINK_NAME"
+# macOS 26 Finder bug: symlinks show dashed icon. Fix: Finder alias + custom-icon bit.
+osascript -e "
+    tell application \"Finder\"
+        make new alias file at disk \"GoldBar\" to folder (POSIX file \"/Applications\") with properties {name:\"${APP_LINK_NAME}\"}
+    end tell
+" 2>/dev/null
+SetFile -a C "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
 
 if [ "$HAS_BG" = true ]; then
     echo "  🖼️  Applying background + icon layout..."

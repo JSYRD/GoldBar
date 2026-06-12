@@ -177,21 +177,26 @@ final class SettingsWindowController: NSObject {
         buttonRow.spacing = 12
         buttonRow.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
-        // --- Separator before data source ---
-        let separator = NSBox()
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
+        // --- Separators ---
+        let separator1 = NSBox()
+        separator1.boxType = .separator
+        separator1.translatesAutoresizingMaskIntoConstraints = false
+
+        let separator2 = NSBox()
+        separator2.boxType = .separator
+        separator2.translatesAutoresizingMaskIntoConstraints = false
 
         // --- Main stack ---
         let mainStack = NSStackView(views: [
             apiKeyRow,
-            separator,
+            separator1,
             dataSourceRow,
             fontSizeRow,
             baselineRow,
-            httpServerRow,
             rateModeRow,
             manualRateRow,
+            separator2,
+            httpServerRow,
             buttonRow,
             statusLabel
         ])
@@ -200,9 +205,10 @@ final class SettingsWindowController: NSObject {
         mainStack.distribution = .fill
         mainStack.spacing = 14
         mainStack.translatesAutoresizingMaskIntoConstraints = false
-        mainStack.setCustomSpacing(10, after: apiKeyRow)    // gap before separator
-        mainStack.setCustomSpacing(10, after: separator)     // gap after separator
-        mainStack.setCustomSpacing(20, after: manualRateRow)
+        mainStack.setCustomSpacing(10, after: apiKeyRow)     // gap before separator1
+        mainStack.setCustomSpacing(10, after: separator1)     // gap after separator1
+        mainStack.setCustomSpacing(10, after: manualRateRow)  // gap before separator2
+        mainStack.setCustomSpacing(10, after: separator2)     // gap after separator2
 
         contentView.addSubview(mainStack)
 
@@ -212,9 +218,11 @@ final class SettingsWindowController: NSObject {
             mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             mainStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -16),
 
-            // Separator stretches full width
-            separator.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            // Separators stretch full width
+            separator1.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            separator1.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            separator2.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            separator2.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
 
             // Rows stretch full width
             apiKeyRow.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),

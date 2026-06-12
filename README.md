@@ -78,14 +78,16 @@ Au ¥895.2/g ↑0.50%    ← colored: green(up) / red(down), or swap via setting
 | Manual Rate | Only used in manual mode |
 | HTTP API | Serve JSON status endpoint on localhost (default port 9188) |
 
+Settings are grouped with separators: API config above, display sliders + HTTP API below.
+
 ### HTTP Status API
 
 When enabled in settings, query via browser or `curl`:
 
 ```bash
-curl http://127.0.0.1:9188/         # Full status
-curl http://127.0.0.1:9188/price    # Price only
-curl http://127.0.0.1:9188/health   # Health check
+curl http://localhost:9188/         # Full status
+curl http://localhost:9188/price    # Price only
+curl http://localhost:9188/health   # Health check
 ```
 
 Example response:

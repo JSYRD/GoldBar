@@ -44,7 +44,7 @@ final class MiniHTTPServer {
         var addr = sockaddr_in()
         addr.sin_family = sa_family_t(AF_INET)
         addr.sin_port = port.bigEndian
-        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+        inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr)
 
         let bindResult = withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -63,7 +63,7 @@ final class MiniHTTPServer {
             running = false; return
         }
 
-        print("[HTTP] Listening on http://127.0.0.1:\(port)")
+        print("[HTTP] Listening on http://localhost:\(port)")
 
         while running {
             let clientFD = Darwin.accept(socketFD, nil, nil)

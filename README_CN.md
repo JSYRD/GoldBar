@@ -78,16 +78,16 @@ Au ¥895.2/g ↑0.50%    ← 绿色(涨) / 红色(跌)，配色可切换
 | 手动汇率 | 仅在手动模式下启用 |
 | HTTP 接口 | 开启后在本机提供 JSON 状态接口 (默认端口 9188) |
 
-修改后点击「保存」即刻生效。
+修改后点击「保存」即刻生效。界面中 API 配置和 UI 设置之间有两条分割线隔开。
 
 ### HTTP 状态接口
 
 在设置中启用后，可通过浏览器或 `curl` 访问：
 
 ```bash
-curl http://127.0.0.1:9188/         # 完整状态
-curl http://127.0.0.1:9188/price    # 仅金价
-curl http://127.0.0.1:9188/health   # 健康检查
+curl http://localhost:9188/         # 完整状态
+curl http://localhost:9188/price    # 仅金价
+curl http://localhost:9188/health   # 健康检查
 ```
 
 返回 JSON 示例：

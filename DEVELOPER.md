@@ -2,6 +2,8 @@
 
 <p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
 
+<p align="center"><img src="./Assets/screenshot.PNG" width="400" alt="screenshot"></p>
+
 # GoldBar Developer Documentation
 
 ## Project Architecture

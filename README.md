@@ -2,6 +2,8 @@ EN | [中文](./README_CN.md) | [Dev](./DEVELOPER.md) | [开发者](./DEVELOPER_
 
 <p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
 
+<p align="center"><img src="./Assets/screenshot.PNG" width="400" alt="screenshot"></p>
+
 # GoldBar — Real-Time Gold Price Menu Bar App
 
 Display the current gold price in RMB per gram on your macOS menu bar, with daily change.

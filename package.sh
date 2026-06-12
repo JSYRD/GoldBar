@@ -72,7 +72,7 @@ MOUNT_DIR="/Volumes/GoldBar"
 
 cp -R "$DIST_DIR"/GoldBar.app "$MOUNT_DIR/"
 
-# 4d. Determine Applications symlink name for locale
+# 4d. Create Applications alias (Finder alias, not symlink — shows folder icon)
 APP_LINK_NAME="Applications"
 case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
     zh) APP_LINK_NAME="应用程序" ;;
@@ -80,20 +80,22 @@ case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
     *)  APP_LINK_NAME="Applications" ;;
 esac
 
-rm -f "$MOUNT_DIR/Applications" "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
-ln -s /Applications "$MOUNT_DIR/$APP_LINK_NAME"
+rm -rf "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
 
-# 4e. Apply background + icon layout
 if [ "$HAS_BG" = true ]; then
     echo "  🖼️  Applying background + icon layout..."
     mkdir -p "$MOUNT_DIR/.background"
     cp "$RESOURCES_DIR/dmg-background.png" "$MOUNT_DIR/.background/background.png"
     SetFile -a V "$MOUNT_DIR/.background" 2>/dev/null || true
 
-    # Background is 1080×760; drop zones centred at (265,350) and (825,350)
+    # Create alias + set window layout in one script (avoids Finder conflicts)
     osascript -e "
         tell application \"Finder\"
             set vol to disk \"GoldBar\"
+            -- Create Applications alias with proper folder icon
+            make new alias file to folder (POSIX file \"/Applications\") at vol
+            set name of result to \"${APP_LINK_NAME}\"
+            -- Open and configure window
             open vol
             set w to container window of vol
             set toolbar visible of w to false
@@ -111,15 +113,6 @@ if [ "$HAS_BG" = true ]; then
             close w
         end tell
     " 2>/dev/null || true
-fi
-
-# 4f. Volume icon: set custom icon via xattr (more reliable than SetFile)
-if [ -f "$RESOURCES_DIR/app-icon.icns" ]; then
-    cp "$RESOURCES_DIR/app-icon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
-    # Write FinderInfo xattr with bit 9 (kHasCustomIcon) set = 0x0400
-    xattr -wx com.apple.FinderInfo \
-        "0000000000000000000400000000000000000000000000000000000000000000" \
-        "$MOUNT_DIR" 2>/dev/null || true
 fi
 
 # Unmount before converting

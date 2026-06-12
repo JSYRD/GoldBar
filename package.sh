@@ -81,7 +81,7 @@ case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
 esac
 
 rm -rf "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
-# Plain symlink — standard DMG convention
+# Standard: symlink to /Applications (works everywhere, shows proper folder icon)
 ln -s /Applications "$MOUNT_DIR/$APP_LINK_NAME"
 
 if [ "$HAS_BG" = true ]; then
@@ -103,11 +103,6 @@ if [ "$HAS_BG" = true ]; then
             set arrangement of opts to not arranged
             set icon size of opts to 128
             set background picture of opts to file \".background:background.png\" of vol
-            -- Give the symlink the same icon as the real Applications folder
-            try
-                set targetIcon to icon of folder (POSIX file \"/Applications\")
-                set icon of item \"${APP_LINK_NAME}\" of w to targetIcon
-            end try
             set position of item \"GoldBar.app\" of w to {265, 350}
             set position of item \"${APP_LINK_NAME}\" of w to {825, 350}
             update vol without registering applications

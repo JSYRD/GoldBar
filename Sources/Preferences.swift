@@ -48,20 +48,25 @@ final class Preferences {
         set { defaults.set(newValue, forKey: Key.colorScheme) }
     }
 
-    /// Status bar font size (pt). Integer, 8…18. Slider guarantees valid input.
+    /// Status bar font size (pt). Integer, 8…18.
     var fontSize: Double {
         get {
             let raw = defaults.double(forKey: Key.fontSize)
-            return (raw >= Self.minFontSize && raw <= Self.maxFontSize) ? raw : Self.defaultFontSize
+            // 0.0 means never set (min valid value is 8.0)
+            return raw == 0 ? Self.defaultFontSize
+                : min(max(raw, Self.minFontSize), Self.maxFontSize)
         }
         set { defaults.set(newValue, forKey: Key.fontSize) }
     }
 
-    /// Baseline offset (pt). Multiple of 0.5, -4.0…+4.0. Slider guarantees valid input.
+    /// Baseline offset (pt). Multiple of 0.5, -4.0…+4.0.
     var baselineOffset: Double {
         get {
+            guard defaults.object(forKey: Key.baselineOffset) != nil else {
+                return Self.defaultBaselineOffset
+            }
             let raw = defaults.double(forKey: Key.baselineOffset)
-            return (raw >= Self.minBaselineOffset && raw <= Self.maxBaselineOffset) ? raw : Self.defaultBaselineOffset
+            return min(max(raw, Self.minBaselineOffset), Self.maxBaselineOffset)
         }
         set { defaults.set(newValue, forKey: Key.baselineOffset) }
     }

@@ -24,7 +24,7 @@ if [ "$MODE" = "release" ]; then
     SWIFT_FLAGS="-O -whole-module-optimization"
     echo "🔨 Building GoldBar (release)..."
 else
-    SWIFT_FLAGS="-Onone -g"
+    SWIFT_FLAGS="-Onone -g -D DEBUG"
     echo "🔨 Building GoldBar (debug)..."
 fi
 
@@ -46,6 +46,7 @@ SWIFT_FILES=(
     "$SOURCE_DIR/SetupWindowController.swift"
     "$SOURCE_DIR/SingleLineFormatter.swift"
     "$SOURCE_DIR/KLineService.swift"
+    "$SOURCE_DIR/DebugLog.swift"
 )
 
 echo "  Compiling ${#SWIFT_FILES[@]} Swift files..."

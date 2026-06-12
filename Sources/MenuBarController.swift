@@ -170,6 +170,7 @@ final class MenuBarController: NSObject {
             guard let self = self else { return }
             self.wsConnectionState = state
             self.updateDataSourceItem()
+            DebugLog.info("ws state", ["state": String(describing: state)])
         }
     }
 
@@ -195,6 +196,7 @@ final class MenuBarController: NSObject {
         currentMode = Preferences.shared.dataSourceMode
         updateDataSourceItem()
 
+        DebugLog.info("mode switch", ["mode": currentMode])
         switch currentMode {
         case "websocket":
             startWebSocket()
@@ -330,8 +332,11 @@ final class MenuBarController: NSObject {
                 previousClose = ref.previousClose
                 updateDisplayIfNeeded()
             }
+            DebugLog.info("kline ref", [
+                "prevClose": String(format: "%.2f", ref.previousClose)
+            ])
         } catch {
-            // Use cached value silently — it's only stale once per day
+            DebugLog.error("kline ref failed", ["error": error.localizedDescription])
         }
     }
 
@@ -351,6 +356,12 @@ final class MenuBarController: NSObject {
             let arrow = chg >= 0 ? "↑" : "↓"
             let color = changeColor(isUp: chg >= 0)
             let title = String(format: "Au ¥%.1f/g \(arrow)%.2f%%", rmbPerGram, abs(chg))
+            DebugLog.info("tick", [
+                "USD/oz": String(format: "%.2f", result.priceUSDPerOunce),
+                "RMB/g": String(format: "%.2f", rmbPerGram),
+                "chg": "\(arrow)\(String(format: "%.2f", abs(chg)))%",
+                "mode": currentMode
+            ])
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: title,
                 attributes: [
@@ -383,6 +394,7 @@ final class MenuBarController: NSObject {
     }
 
     private func updateDisplayOnError() {
+        DebugLog.error("fetch failed", ["error": lastError ?? "unknown"])
         if lastGoldResult == nil {
             statusItem.button?.attributedTitle = NSAttributedString(
                 string: "Au --.-/g",

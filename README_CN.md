@@ -1,5 +1,7 @@
 [EN](./README.md) | 中文 | [Dev](./DEVELOPER.md) | [开发者](./DEVELOPER_CN.md)
 
+<p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
+
 # GoldBar — 实时金价菜单栏应用
 
 在 macOS 菜单栏中实时显示当前黄金价格（人民币/克），含涨跌百分比。
@@ -28,17 +30,22 @@
 ./test.sh          # 运行测试套件
 ./build.sh         # Debug 构建（带终端实时日志）
 ./build.sh release # Release 构建（优化，无日志）
+make package       # Release 构建 + DMG 打包
 ```
 
 ## 安装
+
+### 下载安装（推荐）
+
+从 [GitHub Releases](https://github.com/JSYRD/GoldBar/releases) 下载最新 `GoldBar-*.dmg`，打开后将 GoldBar 拖入「应用程序」即可。
+
+### 从源码构建
 
 ```bash
 cd GoldBar
 ./build.sh release
 open build/GoldBar.app
 ```
-
-编译完成后，可将 `build/GoldBar.app` 拖入 `/Applications/` 文件夹。
 
 ## 使用说明
 

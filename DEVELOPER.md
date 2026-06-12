@@ -1,5 +1,7 @@
 [EN](./README.md) | [中文](./README_CN.md) | Dev | [开发者](./DEVELOPER_CN.md)
 
+<p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
+
 # GoldBar Developer Documentation
 
 ## Project Architecture
@@ -21,6 +23,8 @@ GoldBar/
 │   ├── DebugLog.swift                    # Debug-build terminal logging (#if DEBUG)
 │   ├── StatusSnapshot.swift              # Thread-safe status snapshot for HTTP API
 │   └── HTTPServer.swift                  # Local HTTP server (localhost JSON API)
+├── Assets/
+│   └── app-icon.png                      # Hi-res app icon (1024×1024)
 ├── Tests/
 │   ├── main.swift                        # Test entry point
 │   ├── TestHelpers.swift                 # Assertions + test runner
@@ -164,7 +168,19 @@ Timer (30min) or startup
 ./build.sh          # Debug build
 ./build.sh release  # Optimized build
 ./build.sh run      # Build + launch
+make package        # Release build + DMG
+./package.sh        # (or directly)
 ```
+
+### DMG Packaging
+
+The DMG pipeline (`package.sh`):
+1. `build.sh release` → `build/GoldBar.app`
+2. Create blank UDRW image → mount at `/Volumes/GoldBar`
+3. Copy `.app` + create Applications alias (AppleScript, not symlink — macOS 26 bug workaround)
+4. Apply background + icon layout via AppleScript (`{265,350}` / `{825,350}`)
+5. Unmount → convert to UDZO (compressed, read-only)
+6. Print SHA256 for Homebrew formula
 
 ### Build Script Steps
 1. `swiftc` compiles all `.swift` files → single `GoldBar` binary (arm64)

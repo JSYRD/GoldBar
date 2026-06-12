@@ -1,5 +1,7 @@
 [EN](./README.md) | [中文](./README_CN.md) | [Dev](./DEVELOPER.md) | 开发者
 
+<p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
+
 # GoldBar 开发者文档
 
 ## 项目结构
@@ -21,6 +23,8 @@ GoldBar/
 │   ├── DebugLog.swift                    # Debug 构建终端日志 (#if DEBUG)
 │   ├── StatusSnapshot.swift              # 线程安全状态快照 (HTTP 接口用)
 │   └── HTTPServer.swift                  # 本地 HTTP 服务器 (localhost JSON API)
+├── Assets/
+│   └── app-icon.png                      # 高清应用图标 (1024×1024)
 ├── Tests/
 │   ├── main.swift                        # 测试入口
 │   ├── TestHelpers.swift                 # 断言 + 测试运行器
@@ -157,7 +161,19 @@ Timer (30min) 或启动时
 ./build.sh          # Debug 构建
 ./build.sh release  # 优化构建
 ./build.sh run      # 构建并启动
+make package        # Release 构建 + DMG 打包
+./package.sh        # （或直接调用）
 ```
+
+### DMG 打包
+
+打包流程 (`package.sh`)：
+1. `build.sh release` → `build/GoldBar.app`
+2. 创建空白 UDRW 镜像 → 挂载到 `/Volumes/GoldBar`
+3. 拷贝 `.app` + 创建 Applications 别名（AppleScript，非 symlink——绕过 macOS 26 Finder bug）
+4. 通过 AppleScript 应用背景图 + 图标定位 (`{265,350}` / `{825,350}`)
+5. 卸载 → 转换为 UDZO（压缩只读）
+6. 输出 SHA256 供 Homebrew formula 使用
 
 ## API 参考
 

@@ -1,5 +1,7 @@
 EN | [中文](./README_CN.md) | [Dev](./DEVELOPER.md) | [开发者](./DEVELOPER_CN.md)
 
+<p align="center"><img src="./Assets/app-icon.png" width="128" alt="GoldBar"></p>
+
 # GoldBar — Real-Time Gold Price Menu Bar App
 
 Display the current gold price in RMB per gram on your macOS menu bar, with daily change.
@@ -28,17 +30,22 @@ Display the current gold price in RMB per gram on your macOS menu bar, with dail
 ./test.sh          # Run test suite
 ./build.sh         # Debug build (with terminal logging)
 ./build.sh release # Release build (optimized, no logs)
+make package       # Release build + DMG
 ```
 
 ## Installation
+
+### Download (recommended)
+
+Download the latest `GoldBar-*.dmg` from [GitHub Releases](https://github.com/JSYRD/GoldBar/releases), open it, and drag GoldBar into Applications.
+
+### Build from source
 
 ```bash
 cd GoldBar
 ./build.sh release
 open build/GoldBar.app
 ```
-
-Optionally drag `build/GoldBar.app` to `/Applications/`.
 
 ## Usage
 

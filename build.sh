@@ -81,8 +81,9 @@ echo "  ✅ Binary compiled successfully"
 # ── Bundle ───────────────────────────────────────────────
 echo "  Creating app bundle..."
 
-# Copy Info.plist
+# Copy Info.plist + icon
 cp "$RESOURCES_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+[ -f "$RESOURCES_DIR/app-icon.icns" ] && cp "$RESOURCES_DIR/app-icon.icns" "$APP_BUNDLE/Contents/Resources/app-icon.icns"
 
 # Create PkgInfo
 echo "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"

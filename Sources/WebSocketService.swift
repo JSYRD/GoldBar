@@ -40,6 +40,7 @@ final class WebSocketService: NSObject {
     private var seqID: UInt32 = 0
     private var reconnectDelay: TimeInterval = 2.0
     private var wantsConnection = false
+    private var heartbeatFailures = 0
 
     // MARK: - Dispatch queue
     private let wsQueue = DispatchQueue(label: "com.goldbar.websocket", qos: .utility)
@@ -105,15 +106,22 @@ final class WebSocketService: NSObject {
         webSocketTask?.sendPing { [weak self] error in
             guard let self = self, self.wantsConnection else { return }
 
-            if let error = error {
-                // Connection failed — will be handled by didClose
-                print("[WebSocket] Ping failed: \(error.localizedDescription)")
+            if error != nil {
+                // Connection failed — clean up and schedule reconnect.
+                // Don't rely on didClose: a network drop may not produce a clean TCP close.
+                self.wsQueue.async {
+                    self.webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+                    self.webSocketTask = nil
+                    self.state = .disconnected
+                    self.scheduleReconnect()
+                }
                 return
             }
 
             self.wsQueue.async {
                 self.state = .connected
-                self.reconnectDelay = 2.0 // reset backoff
+                self.reconnectDelay = 2.0        // reset backoff
+                self.heartbeatFailures = 0        // reset heartbeat health
                 self.startHeartbeat()
                 self.subscribe()
                 self.startReceiving()
@@ -136,6 +144,7 @@ final class WebSocketService: NSObject {
     }
 
     private func sendHeartbeat() {
+        guard webSocketTask != nil else { return }
         seqID += 1
         let message: [String: Any] = [
             "cmd_id": 22000,
@@ -143,7 +152,24 @@ final class WebSocketService: NSObject {
             "trace": UUID().uuidString,
             "data": [:] as [String: Any]
         ]
-        sendJSON(message, label: "heartbeat")
+        sendJSON(message) { [weak self] success in
+            guard let self = self else { return }
+            if success {
+                self.heartbeatFailures = 0
+            } else {
+                self.heartbeatFailures += 1
+                if self.heartbeatFailures >= 3 {
+                    // 3 consecutive heartbeat failures → assume dead, reconnect
+                    self.webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+                    self.webSocketTask = nil
+                    self.cancelHeartbeat()
+                    self.state = .disconnected
+                    if self.wantsConnection {
+                        self.scheduleReconnect()
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Subscribe
@@ -160,7 +186,7 @@ final class WebSocketService: NSObject {
                 ]
             ]
         ]
-        sendJSON(message, label: "subscribe")
+        sendJSON(message)
     }
 
     // MARK: - Receive loop
@@ -194,9 +220,18 @@ final class WebSocketService: NSObject {
                 startReceiving()
             }
 
-        case .failure(let error):
-            print("[WebSocket] Receive error: \(error.localizedDescription)")
-            // Connection likely broken — will be re-established via didClose
+        case .failure:
+            // Connection broken — force reconnect, don't wait for didClose
+            wsQueue.async { [weak self] in
+                guard let self = self else { return }
+                self.webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+                self.webSocketTask = nil
+                self.cancelHeartbeat()
+                self.state = .disconnected
+                if self.wantsConnection {
+                    self.scheduleReconnect()
+                }
+            }
         }
     }
 
@@ -206,6 +241,9 @@ final class WebSocketService: NSObject {
               let cmdID = json["cmd_id"] as? Int else {
             return
         }
+
+        // Any successful receive means the connection is alive
+        heartbeatFailures = 0
 
         switch cmdID {
         case 22001:
@@ -260,15 +298,14 @@ final class WebSocketService: NSObject {
 
     // MARK: - Send helper
 
-    private func sendJSON(_ dict: [String: Any], label: String) {
+    private func sendJSON(_ dict: [String: Any], completion: ((Bool) -> Void)? = nil) {
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
               let text = String(data: data, encoding: .utf8) else {
+            completion?(false)
             return
         }
         webSocketTask?.send(.string(text)) { error in
-            if let error = error {
-                print("[WebSocket] Send \(label) error: \(error.localizedDescription)")
-            }
+            completion?(error == nil)
         }
     }
 

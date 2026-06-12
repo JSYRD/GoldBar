@@ -57,51 +57,64 @@ rm -f "$DMG_PATH"
 RW_DMG="$BUILD_DIR/GoldBar-rw.dmg"
 rm -f "$RW_DMG"
 
-# 4a. Create read-write DMG from dist folder
+# 4a. Create blank read-write DMG
 hdiutil create \
-    -srcfolder "$DIST_DIR" \
+    -size 15m \
     -volname "GoldBar" \
-    -format UDRW \
     -fs HFS+ \
     -ov \
     "$RW_DMG" > /dev/null
 
-# 4b. Mount for layout customisation
+# 4b. Mount + copy contents
 hdiutil detach "/Volumes/GoldBar" -force -quiet 2>/dev/null || true
 hdiutil attach -readwrite -noverify -noautoopen "$RW_DMG" > /dev/null
 MOUNT_DIR="/Volumes/GoldBar"
 
-# Remove the auto-copied symlink and re-create (ensures correct)
-rm -f "$MOUNT_DIR/Applications" 2>/dev/null || true
-ln -s /Applications "$MOUNT_DIR/Applications"
+cp -R "$DIST_DIR"/GoldBar.app "$MOUNT_DIR/"
 
-# 4d. Copy background + set layout, then unmount
+# 4c. Set DMG volume icon (same as app icon)
+if [ -f "$RESOURCES_DIR/app-icon.icns" ]; then
+    cp "$RESOURCES_DIR/app-icon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
+    SetFile -a C "$MOUNT_DIR" 2>/dev/null || true
+fi
+
+# 4d. Determine Applications symlink name for locale
+APP_LINK_NAME="Applications"
+case "$(defaults read -g AppleLocale 2>/dev/null | cut -d_ -f1)" in
+    zh) APP_LINK_NAME="应用程序" ;;
+    ja) APP_LINK_NAME="Applications" ;;   # Japanese uses same
+    ko) APP_LINK_NAME="응용 프로그램" ;;
+    *)  APP_LINK_NAME="Applications" ;;
+esac
+
+rm -f "$MOUNT_DIR/Applications" "$MOUNT_DIR/$APP_LINK_NAME" 2>/dev/null || true
+ln -s /Applications "$MOUNT_DIR/$APP_LINK_NAME"
+
+# 4e. Apply background + icon layout
 if [ "$HAS_BG" = true ]; then
     echo "  🖼️  Applying background + icon layout..."
     mkdir -p "$MOUNT_DIR/.background"
     cp "$RESOURCES_DIR/dmg-background.png" "$MOUNT_DIR/.background/background.png"
-
-    # Hide the background folder in Finder
     SetFile -a V "$MOUNT_DIR/.background" 2>/dev/null || true
 
     osascript -e "
         tell application \"Finder\"
-            set dmg to disk \"GoldBar\"
-            open dmg
-            tell container window of dmg
-                set current view to icon view
-                set toolbar visible to false
-                set statusbar visible to false
-                set bounds to {100, 100, 640, 460}
-                set theViewOptions to the icon view options
-                set arrangement of theViewOptions to not arranged
-                set background picture of theViewOptions to file \".background:background.png\"
-                set position of item \"GoldBar.app\" to {160, 170}
-                set position of item \"Applications\" to {380, 170}
-            end tell
-            update dmg without registering applications
-            delay 1
-            close dmg
+            set vol to disk \"GoldBar\"
+            open vol
+            set w to container window of vol
+            set toolbar visible of w to false
+            set statusbar visible of w to false
+            set current view of w to icon view
+            set bounds of w to {200, 200, 740, 480}
+            set opts to icon view options of w
+            set arrangement of opts to not arranged
+            set icon size of opts to 72
+            set background picture of opts to file \".background:background.png\" of vol
+            set position of item \"GoldBar.app\" of w to {120, 120}
+            set position of item \"${APP_LINK_NAME}\" of w to {340, 120}
+            update vol without registering applications
+            delay 0.5
+            close w
         end tell
     " 2>/dev/null || true
 fi
